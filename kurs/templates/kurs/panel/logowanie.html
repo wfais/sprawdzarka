@@ -1,0 +1,13 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Logowanie{% endblock %}
+{% block tresc %}
+<div class="karta" style="max-width:420px;margin:40px auto">
+  <h1>Logowanie prowadzącego</h1>
+  <p class="podtytul">Konto zakładasz poleceniem <code>python manage.py createsuperuser</code>.</p>
+  <form method="post" class="formularz">{% csrf_token %}
+    {{ form.as_div }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="glowny" type="submit">Zaloguj</button>
+  </form>
+</div>
+{% endblock %}

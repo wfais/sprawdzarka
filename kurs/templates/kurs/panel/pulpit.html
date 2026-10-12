@@ -1,0 +1,57 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Pulpit{% endblock %}
+{% block tresc %}
+<div class="naglowek">
+  <div><h1>Pulpit</h1><p class="podtytul">Grupy, wydane zestawy i stan oddawania.</p></div>
+  <div class="przyciski">
+    <a class="przycisk" href="{% url 'panel:grupy' %}">Grupy</a>
+    <a class="przycisk glowny" href="{% url 'panel:zestaw_nowy' %}">Nowy zestaw</a>
+  </div>
+</div>
+
+{% if brak_grup or brak_zestawow %}
+<div class="karta">
+  <h2>Pierwsze kroki</h2>
+  <ol>
+    <li>{% if brak_grup %}<a href="{% url 'panel:grupy' %}">Dodaj grupy</a>, np. „Grupa 4” ze skrótem g4.{% else %}Grupy dodane.{% endif %}</li>
+    <li>{% if brak_zestawow %}<a href="{% url 'panel:zestaw_nowy' %}">Dodaj zestaw</a>: wskaż swoje repozytorium z zadaniami w organizacji.{% else %}Zestawy dodane.{% endif %}</li>
+    <li>Na stronie zestawu wydaj go grupom z terminami. Każda grupa dostanie własny link i własne repozytorium startowe.</li>
+    <li>Link wyślij studentom (Pegaz, e-mail, ogłoszenie).</li>
+  </ol>
+</div>
+{% endif %}
+
+{% if bledy or kandydaci %}
+<div class="karta">
+  <h2>Wymaga uwagi</h2>
+  {% if kandydaci %}<p><a href="{% url 'panel:studenci' %}?filtr=bez">Imiona i nazwiska do zatwierdzenia z README: {{ kandydaci }}</a></p>{% endif %}
+  {% for z in bledy %}
+    <p><span class="znacznik czerwony">błąd tworzenia</span> <a href="{% url 'panel:zgloszenie' z.pk %}">{{ z.student }}, {{ z.przydzial }}</a></p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="siatka">
+{% for grupa in grupy %}
+  <section class="karta">
+    <div class="naglowek" style="margin-bottom:8px">
+      <h2 style="margin:0">{{ grupa.nazwa }}</h2>
+      <span class="slabe male">{{ grupa.opis }}</span>
+    </div>
+    {% for p in grupa.lista %}
+      <div style="padding:10px 0;border-top:1px solid var(--linia)">
+        <div style="margin-bottom:6px">
+          <a href="{% url 'panel:przydzial' p.pk %}"><strong>{{ p.zestaw.nazwa }}</strong></a>
+          <div class="male drugie">termin {{ p.termin_miekki|date:"d.m.Y H:i" }} · ostateczny {{ p.termin_twardy|date:"d.m.Y H:i" }}{% if not p.otwarty %} · zamknięty{% endif %}</div>
+        </div>
+        {% include "kurs/panel/_paski.html" %}
+      </div>
+    {% empty %}
+      <p class="slabe">Brak wydanych zestawów.</p>
+    {% endfor %}
+  </section>
+{% empty %}
+  {% if not brak_grup %}<p class="puste">Brak aktywnych grup.</p>{% endif %}
+{% endfor %}
+</div>
+{% endblock %}

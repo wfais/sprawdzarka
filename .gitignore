@@ -1,0 +1,17 @@
+# Srodowiska i pamiec podreczna Pythona
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Konfiguracja lokalna i dane (nigdy do repozytorium)
+.env
+dane/
+static_zebrane/
+*.pem
+*.sqlite3
+
+# Edytory
+.idea/
+.vscode/

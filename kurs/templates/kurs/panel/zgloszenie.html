@@ -1,0 +1,143 @@
+{% extends "kurs/panel/baza.html" %}
+{% block naglowek_strony %}{% if ewaluacja and ewaluacja.w_toku %}<meta http-equiv="refresh" content="8">{% endif %}{% endblock %}
+{% block tytul %}{{ z.student }}{% endblock %}
+{% block tresc %}
+<div class="okruszki"><a href="{% url 'panel:przydzial' z.przydzial.pk %}">{{ z.przydzial.grupa.nazwa }}: {{ z.przydzial.zestaw.nazwa }}</a></div>
+<div class="naglowek">
+  <div>
+    <h1>{% if z.student.imie_nazwisko %}{{ z.student.imie_nazwisko }}{% else %}@{{ z.student.login }}{% endif %}</h1>
+    <p class="podtytul">Konto <a href="{{ github }}/{{ z.student.login }}" target="_blank" rel="noopener">@{{ z.student.login }}</a>
+      {% if z.repo_nazwa %} · repozytorium <a class="mono" href="{{ z.url_repo }}" target="_blank" rel="noopener">{{ z.repo_nazwa }}</a>{% endif %}</p>
+  </div>
+  <div class="przyciski">
+    {% if z.url_pr %}<a class="przycisk glowny" href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">Przeglądaj kod i komentuj</a>{% endif %}
+    {% if z.status == Status.GOTOWE %}
+    <form method="post" action="{% url 'panel:zgloszenie_odswiez' z.pk %}" class="w-linii">{% csrf_token %}
+      <button type="submit" data-czekaj="Odświeżam">Odśwież</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if z.status == Status.BLAD or z.status == Status.TWORZENIE %}
+<div class="karta">
+  <h2>Repozytorium nie zostało utworzone</h2>
+  {% if z.blad_opis %}<p class="blad-tekst">{{ z.blad_opis }}</p>{% endif %}
+  <form method="post" action="{% url 'panel:zgloszenie_ponow' z.pk %}">{% csrf_token %}
+    <button class="glowny" type="submit" data-czekaj="Ponawiam">Ponów tworzenie</button>
+  </form>
+</div>
+{% endif %}
+
+{% if z.testy_zmienione %}
+<div class="karta ostrzezenie">
+  <h2>{% include "kurs/panel/_testy.html" %} Student zmienił pliki testów</h2>
+  <p class="male drugie">Porównanie z wersją startową repozytorium (testy, ich dane i konfiguracja pytest).
+    Ocena automatyczna zawsze uruchamia Twoje testy, zmiany studenta w tych plikach są pomijane.</p>
+  <dl class="opis-pola">
+    {% for etykieta, pliki in z.lista_zmian_testow %}<dt>{{ etykieta|capfirst }}</dt><dd class="mono male">{% for p in pliki %}{{ p }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd>{% endfor %}
+  </dl>
+  {% if z.zmiany_testow.niepewne %}<p class="male slabe">Części historii nie udało się porównać.</p>{% endif %}
+  {% if z.url_pr_pliki %}<p class="male"><a href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">Zobacz zmiany w pull requeście</a></p>{% endif %}
+</div>
+{% endif %}
+
+<div class="siatka-2">
+  <div>
+    <div class="karta">
+      <h2>Termin</h2>
+      <p>{% include "kurs/panel/_znacznik.html" %} <span class="drugie">{{ z.stan_opis }}</span></p>
+      <dl class="opis-pola">
+        <dt>Termin</dt><dd>{{ z.termin_miekki|date:"d.m.Y H:i" }}{% if z.wyjatek_termin_miekki %} <span class="znacznik fiolet">indywidualny</span>{% endif %}</dd>
+        <dt>Termin ostateczny</dt><dd>{{ z.termin_twardy|date:"d.m.Y H:i" }}{% if z.wyjatek_termin_twardy %} <span class="znacznik fiolet">indywidualny</span>{% endif %}</dd>
+        <dt>Sugerowany mnożnik</dt><dd>{% if z.sugerowany_mnoznik is not None %}{{ z.sugerowany_mnoznik|floatformat:"-2" }}{% else %}<span class="slabe">brak</span>{% endif %}</dd>
+        <dt>Oceniany stan</dt><dd>{% if z.sha_oceniany %}<a class="mono" href="{{ z.url_ocenianego_stanu }}" target="_blank" rel="noopener">{{ z.sha_oceniany|slice:":10" }}</a>{% else %}<span class="slabe">brak</span>{% endif %}</dd>
+        <dt>Przeliczono</dt><dd>{% if z.przeliczono %}{{ z.przeliczono|date:"d.m.Y H:i" }}{% else %}<span class="slabe">jeszcze nie</span>{% endif %}</dd>
+      </dl>
+    </div>
+
+    {% include "kurs/panel/_ocena_automatyczna.html" %}
+
+    <div class="karta">
+      {% if ewaluacja and ewaluacja.status == "gotowa" %}<details><summary><strong>Ocena ręczna</strong> (bez rozbicia na zadania)</summary><div style="margin-top:10px">{% else %}
+      <h2>Ocena i zamknięcie pull requestu</h2>{% endif %}
+      {% if z.pr_zamkniety %}
+        <div class="uwaga">Pull request zamknięty {{ z.oceniono|date:"d.m.Y H:i" }}. Wynik: <strong>{{ z.wynik|floatformat:"-2" }} / {{ z.przydzial.zestaw.punkty_max|floatformat:"-2" }}</strong>. Ponowne wysłanie doda nowy komentarz.</div>
+      {% endif %}
+      <form method="post" action="{% url 'panel:zgloszenie_ocena' z.pk %}" class="formularz"
+            data-potwierdz="Wysłać ocenę do pull requestu i zamknąć go?">{% csrf_token %}
+        {{ formularz_oceny.as_div }}
+        <div class="przyciski">
+          <button class="glowny" type="submit" data-czekaj="Wysyłam">Zamknij z oceną</button>
+          <button type="submit" name="nastepny" value="przydzial" data-czekaj="Wysyłam">Zamknij i wróć do listy</button>
+        </div>
+      </form>
+      {% if ewaluacja and ewaluacja.status == "gotowa" %}</div></details>{% endif %}
+    </div>
+  </div>
+
+  <div>
+    <div class="karta">
+      <h2>Student</h2>
+      <form method="post" action="{% url 'panel:student_nazwisko' z.student.pk %}" class="formularz">{% csrf_token %}
+        {{ formularz_nazwiska.as_div }}
+        <input type="hidden" name="nastepny" value="{{ request.path }}">
+        <button class="maly" type="submit">Zapisz</button>
+      </form>
+      {% if z.student.kandydat_readme and not z.student.imie_nazwisko %}
+      <form method="post" action="{% url 'panel:student_nazwisko' z.student.pk %}">{% csrf_token %}
+        <input type="hidden" name="nastepny" value="{{ request.path }}">
+        <p class="male">Z README: <strong>{{ z.student.kandydat_readme }}</strong></p>
+        <button class="maly" name="akcja" value="zatwierdz">Zatwierdź</button>
+      </form>
+      {% endif %}
+      {% if inne %}
+      <h3 style="margin-top:14px">Inne zestawy</h3>
+      {% for i in inne %}<div class="male"><a href="{% url 'panel:zgloszenie' i.pk %}">{{ i.przydzial }}</a> {% include "kurs/panel/_znacznik.html" with z=i %}</div>{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="karta">
+      <h2>Indywidualny termin</h2>
+      <form method="post" action="{% url 'panel:zgloszenie_termin' z.pk %}" class="formularz">{% csrf_token %}
+        {{ formularz_wyjatku.as_div }}
+        <button class="maly" type="submit">Zapisz terminy</button>
+      </form>
+    </div>
+
+    <div class="karta">
+      <h2>Wypchnięcia</h2>
+      {% if wypchniecia %}
+      <table class="tabela male">
+        <tr><th>Czas</th><th>Stan</th><th>Kto</th></tr>
+        {% for w in wypchniecia %}
+        <tr><td>{{ w.czas|date:"d.m H:i:s" }}</td>
+          <td class="mono">{% if w.ref != "refs/heads/main" %}{{ w.ref|cut:"refs/heads/" }} {% endif %}<a href="{{ z.url_repo }}/tree/{{ w.sha_po }}" target="_blank" rel="noopener">{{ w.sha_po|slice:":7" }}</a></td>
+          <td>{{ w.autor }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="slabe">Brak zarejestrowanych wypchnięć.</p>{% endif %}
+    </div>
+
+    {% if z.repo_nazwa %}
+    <div class="karta">
+      <h2>Pobranie na dysk</h2>
+      <form method="post" action="{% url 'panel:zgloszenie_zaproszenie' z.pk %}" style="margin-bottom:10px">{% csrf_token %}
+        <span class="male drugie">Student nie widzi repozytorium? Zaproszenia wygasają po 7 dniach.</span>
+        <button class="maly" type="submit">Wyślij zaproszenie ponownie</button>
+      </form>
+      <div class="kopiuj"><input id="klon" type="text" readonly value="git clone {{ github }}/{{ z.repo_nazwa }}.git"><button type="button" data-kopiuj="klon">Kopiuj</button></div>
+    </div>
+    {% endif %}
+
+    <div class="karta">
+      <h2>Zerowanie zgłoszenia</h2>
+      <p class="drugie male">Student traci dostęp do repozytorium i może zaakceptować zestaw od nowa, na czysto.</p>
+      <form method="post" action="{% url 'panel:zgloszenie_zeruj' z.pk %}" data-potwierdz="Wyzerować zgłoszenie tego studenta?">{% csrf_token %}
+        <label class="male"><input type="checkbox" name="usun_repo" value="1"> usuń repozytorium zamiast archiwizować</label>
+        <div style="margin-top:8px"><button class="niebezpieczny maly" type="submit">Zeruj zgłoszenie</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

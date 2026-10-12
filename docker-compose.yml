@@ -1,0 +1,105 @@
+# Sprawdzarka: baza, serwis WWW, robot (terminy i oceny), odizolowany tester, HTTPS
+#
+# Lokalnie (bez domeny):   docker compose up -d --build        -> http://localhost:8000
+# Na serwerze z domena:    docker compose --profile serwer up -d --build
+#
+# Konfiguracja: plik .env (wzor: .env.przyklad), klucz aplikacji GitHub: dane/github-app.pem
+
+x-wspolne: &wspolne
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://sprawdzarka:${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD w pliku .env}@baza:5432/sprawdzarka
+    SPRAWDZARKA_DANE: /app/dane
+    GITHUB_APP_PRIVATE_KEY_PATH: /app/dane/github-app.pem
+    SPRAWDZARKA_TESTY: kolejka
+    SPRAWDZARKA_KOLEJKA: /kolejka
+    SPRAWDZARKA_OCENA_W_WATKU: "0"
+  volumes:
+    - ./dane:/app/dane
+    - kolejka:/kolejka
+
+services:
+  baza:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sprawdzarka
+      POSTGRES_USER: sprawdzarka
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD w pliku .env}
+    volumes:
+      - baza:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sprawdzarka -d sprawdzarka"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  web:
+    <<: *wspolne
+    ports:
+      - "${ADRES_WEB:-127.0.0.1}:8000:8000"
+    depends_on:
+      baza:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/zdrowie/', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  robot:
+    <<: *wspolne
+    # Na serwerze GitHub wysyla powiadomienia o wypchnieciach, pelna synchronizacja wystarczy co 30 minut
+    command: ["python", "manage.py", "robot", "--synchronizacja-co", "1800"]
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Kod studentow uruchamiany bez sieci, bez bazy i bez kluczy. Proces testera dziala jako root
+  # wylacznie po to, by uruchamiac kod studentow na osobnym koncie (nobody), ktore nie moze pisac
+  # w kolejce, i po kazdym zleceniu zabijac wszystkie jego procesy.
+  tester:
+    build: .
+    restart: unless-stopped
+    command: ["python", "narzedzia/tester.py", "/kolejka"]
+    init: true  # sprzata procesy-sieroty po kodzie studentow
+    network_mode: none
+    environment:
+      SPRAWDZARKA_UID_TESTOW: "65534"
+    volumes:
+      - kolejka:/kolejka
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN, KILL, DAC_OVERRIDE, FOWNER]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+
+  caddy:
+    image: caddy:2
+    profiles: ["serwer"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMENA: ${DOMENA:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dane:/data
+      - caddy_konfiguracja:/config
+    depends_on:
+      - web
+
+volumes:
+  baza:
+  kolejka:
+  caddy_dane:
+  caddy_konfiguracja:

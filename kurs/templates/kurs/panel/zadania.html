@@ -1,0 +1,34 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Zadania: {{ zestaw.nazwa }}{% endblock %}
+{% block tresc %}
+<div class="okruszki"><a href="{% url 'panel:zestaw' zestaw.pk %}">{{ zestaw.nazwa }}</a></div>
+<div class="naglowek"><div><h1>Zadania i kryteria</h1>
+  <p class="podtytul">Katalog wiąże zadanie z plikami i testami (np. <code>ZADANIE1/</code>). Testy z katalogu zadania liczą się do jego wyniku.
+  Zadania z interfejsem graficznym oznacz jako „tylko modele” albo „tylko ręcznie”.</p></div></div>
+<form method="post" class="karta">{% csrf_token %}
+  {{ formularze.management_form }}
+  {% if formularze.non_form_errors %}<ul class="errorlist">{% for b in formularze.non_form_errors %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  <div class="przewijanie">
+  <table class="tabela">
+    <tr><th>Kol.</th><th>Oznaczenie</th><th>Katalog</th><th>Punkty</th><th>Sposób oceny</th><th style="width:38%">Kryteria</th><th>Usuń</th></tr>
+    {% for f in formularze %}
+    <tr>
+      <td>{{ f.id }}{{ f.kolejnosc }}</td>
+      <td>{{ f.kod }}{{ f.kod.errors }}</td>
+      <td>{{ f.katalog }}</td>
+      <td>{{ f.punkty }}{{ f.punkty.errors }}</td>
+      <td>{{ f.tryb }}</td>
+      <td>{{ f.kryteria }}</td>
+      <td>{% if f.instance.pk %}{{ f.DELETE }}{% endif %}</td>
+    </tr>
+    {% if f.non_field_errors %}<tr><td colspan="7"><ul class="errorlist">{% for b in f.non_field_errors %}<li>{{ b }}</li>{% endfor %}</ul></td></tr>{% endif %}
+    {% endfor %}
+  </table>
+  </div>
+  <div class="przyciski" style="margin-top:12px">
+    <button class="glowny" type="submit">Zapisz zadania</button>
+    <a class="przycisk" href="{% url 'panel:zestaw' zestaw.pk %}">Anuluj</a>
+    <span class="male slabe">Puste wiersze są pomijane. Po zapisie pojawią się kolejne puste wiersze.</span>
+  </div>
+</form>
+{% endblock %}

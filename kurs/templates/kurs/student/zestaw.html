@@ -1,0 +1,60 @@
+{% extends "kurs/student/baza.html" %}
+{% block naglowek_strony %}{% if zgloszenie and zgloszenie.status == Status.TWORZENIE and not utknelo %}<meta http-equiv="refresh" content="4">{% endif %}{% endblock %}
+{% block tytul %}{{ przydzial.zestaw.nazwa }}{% endblock %}
+{% block tresc %}
+{% if messages %}<ul class="komunikaty">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+<div class="okruszki">{{ przydzial.grupa.nazwa }}</div>
+<h1>{{ przydzial.zestaw.nazwa }}</h1>
+<dl class="opis-pola" style="margin:12px 0 18px">
+  <dt>Termin</dt><dd><strong>{% if zgloszenie %}{{ zgloszenie.termin_miekki|date:"d.m.Y, H:i" }}{% else %}{{ przydzial.termin_miekki|date:"d.m.Y, H:i" }}{% endif %}</strong></dd>
+  <dt>Z karą do</dt><dd>{% if zgloszenie %}{{ zgloszenie.termin_twardy|date:"d.m.Y, H:i" }}{% else %}{{ przydzial.termin_twardy|date:"d.m.Y, H:i" }}{% endif %}</dd>
+</dl>
+
+{% if zgloszenie and zgloszenie.status == Status.GOTOWE %}
+  <h2>Twoje repozytorium jest gotowe</h2>
+  <ol class="kroki">
+    <li><a class="przycisk glowny" href="{{ zgloszenie.url_zaproszenia }}" target="_blank" rel="noopener">Przyjmij zaproszenie na GitHubie</a><br>
+      <span class="pomoc">Bez tego nie zobaczysz repozytorium. Zaproszenie przyszło też e-mailem.</span></li>
+    <li>Sklonuj repozytorium:
+      <div class="kopiuj" style="margin-top:4px"><input id="klon" type="text" readonly value="git clone {{ zgloszenie.url_repo }}.git"><button type="button" data-kopiuj="klon">Kopiuj</button></div></li>
+    <li>Rozwiązuj zadania i wysyłaj zmiany: <code>git add</code>, <code>git commit</code>, <code>git push</code> na gałąź <code>{{ galaz }}</code>. Możesz wypychać dowolnie często, liczy się czas wypchnięcia.</li>
+    <li>W pliku <code>README.md</code> wpisz swoje imię i nazwisko.</li>
+  </ol>
+  <p class="drugie male">Nie zmieniaj nazwy repozytorium. Pull request „Feedback” zostaw otwarty: tam pojawią się uwagi i ocena.</p>
+  <form method="post" class="przyciski" style="margin-bottom:10px">{% csrf_token %}
+    <span class="male drugie">Zaproszenie wygasło albo nie dotarło?</span>
+    <button class="maly" type="submit" name="akcja" value="zaproszenie">Wyślij ponownie</button>
+  </form>
+  <p><a href="{{ zgloszenie.url_repo }}" target="_blank" rel="noopener">{{ zgloszenie.repo_nazwa }}</a></p>
+{% elif zgloszenie and zgloszenie.status == Status.TWORZENIE %}
+  <h2>Tworzę repozytorium</h2>
+  <p>To potrwa kilka sekund, strona odświeży się sama.</p>
+  {% if utknelo %}
+  <form method="post">{% csrf_token %}<button class="glowny" type="submit">Spróbuj ponownie</button></form>
+  {% endif %}
+{% else %}
+  {% if zgloszenie and zgloszenie.status == Status.BLAD %}
+    <div class="uwaga">Nie udało się utworzyć repozytorium. Spróbuj ponownie. Jeśli to nie pomoże, napisz do prowadzącego.</div>
+  {% endif %}
+  {% if przydzial.otwarty or zgloszenie %}
+  <form method="post" class="formularz">{% csrf_token %}
+    {% if wymagaj_nazwiska %}
+      {{ formularz.as_div }}
+      <p class="pomoc" style="margin-top:-6px">Podajesz je tylko raz, przy pierwszym zestawie. Widzi je wyłącznie prowadzący.</p>
+    {% else %}
+      <p>Zalogowano jako <strong>{{ student.imie_nazwisko }}</strong>.</p>
+    {% endif %}
+    <p class="drugie male">Po akceptacji powstanie Twoje prywatne repozytorium z zadaniami. Widzisz je tylko Ty i prowadzący.</p>
+    <button class="glowny" type="submit" data-czekaj="Tworzę repozytorium, chwilę">{% if zgloszenie %}Spróbuj ponownie{% else %}Akceptuję zestaw{% endif %}</button>
+  </form>
+  {% else %}
+    <div class="uwaga">Ten zestaw nie przyjmuje już zgłoszeń.</div>
+  {% endif %}
+{% endif %}
+
+<div class="student-stopka">
+  <span>Konto GitHub: <strong>@{{ uzytkownik.login }}</strong></span>
+  <a href="{% url 'student:wyloguj' %}?next={{ request.path|urlencode }}"
+     title="Aby wybrać inne konto, wyloguj się najpierw z github.com w tej przeglądarce.">To nie moje konto</a>
+</div>
+{% endblock %}

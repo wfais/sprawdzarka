@@ -1,0 +1,140 @@
+/* Sprawdzarka: wspolny arkusz stylow panelu i stron studenta */
+:root {
+  --tlo: #f6f5f1;
+  --karta: #ffffff;
+  --tekst: #1f1e1c;
+  --drugi: #5f5d57;
+  --slaby: #8a8780;
+  --linia: #e3e0d7;
+  --linia-mocna: #cfcbbf;
+  --akcent: #1d4f91;
+  --akcent-tlo: #e3ecfa;
+  --akcent-tekst: #ffffff;
+  --zielony-tlo: #e3f3df; --zielony: #24661c;
+  --zolty-tlo: #fbf0c4;   --zolty: #735600;
+  --pomaranczowy-tlo: #fde2cc; --pomaranczowy: #8a3d00;
+  --czerwony-tlo: #fbdfdf; --czerwony: #8f1d1d;
+  --niebieski-tlo: #e3ecfa; --niebieski: #1d4f91;
+  --szary-tlo: #ecebe6;   --szary: #5f5d57;
+  --fiolet-tlo: #ece9fb;  --fiolet: #4b3fa6;
+  --promien: 8px;
+  --czcionka: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tlo: #1b1a18; --karta: #24231f; --tekst: #ecebe6; --drugi: #b5b2a9; --slaby: #8a8780;
+    --linia: #3a3833; --linia-mocna: #4c4a44; --akcent: #8fb6ec; --akcent-tlo: #1f3550; --akcent-tekst: #10233b;
+    --zielony-tlo: #20381c; --zielony: #a8dc9c;
+    --zolty-tlo: #3d3310;   --zolty: #f0d27a;
+    --pomaranczowy-tlo: #44291a; --pomaranczowy: #f5b98a;
+    --czerwony-tlo: #4a1f1f; --czerwony: #f3a6a6;
+    --niebieski-tlo: #1f3550; --niebieski: #a8c8f3;
+    --szary-tlo: #34322d;   --szary: #c9c6bd;
+    --fiolet-tlo: #2e2a4f;  --fiolet: #c3bcf5;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--tlo); color: var(--tekst); font: 15px/1.55 var(--czcionka); }
+a { color: var(--akcent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .mono { font-family: var(--mono); font-size: 13px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 17px; font-weight: 600; margin: 0 0 12px; }
+h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+p { margin: 0 0 10px; }
+
+.pasek { display: flex; align-items: center; gap: 22px; padding: 10px 24px; background: var(--karta);
+  border-bottom: 1px solid var(--linia); position: sticky; top: 0; z-index: 5; }
+.pasek .logo { font-weight: 700; color: var(--tekst); letter-spacing: .2px; }
+.pasek nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
+.pasek nav a { color: var(--drugi); }
+.pasek nav a.aktywny { color: var(--tekst); font-weight: 600; }
+.tresc { max-width: 1180px; margin: 0 auto; padding: 22px 24px 60px; }
+.naglowek { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.podtytul { color: var(--drugi); font-size: 14px; }
+.okruszki { font-size: 13px; color: var(--drugi); margin-bottom: 6px; }
+
+.karta { background: var(--karta); border: 1px solid var(--linia); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+.karta.ostrzezenie { border-left: 4px solid var(--czerwony); }
+.siatka { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.siatka-2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 900px) { .siatka-2 { grid-template-columns: minmax(0, 1fr); } }
+.metryki { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 16px; }
+.metryka { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 10px 12px; }
+.metryka .etykieta { font-size: 12px; color: var(--drugi); }
+.metryka .wartosc { font-size: 20px; font-weight: 600; }
+
+.znacznik { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; white-space: nowrap; }
+.znacznik.zielony { background: var(--zielony-tlo); color: var(--zielony); }
+.znacznik.zolty { background: var(--zolty-tlo); color: var(--zolty); }
+.znacznik.pomaranczowy { background: var(--pomaranczowy-tlo); color: var(--pomaranczowy); }
+.znacznik.czerwony { background: var(--czerwony-tlo); color: var(--czerwony); }
+.znacznik.niebieski { background: var(--niebieski-tlo); color: var(--niebieski); }
+.znacznik.szary { background: var(--szary-tlo); color: var(--szary); }
+.znacznik.fiolet { background: var(--fiolet-tlo); color: var(--fiolet); }
+a.znacznik:hover { text-decoration: none; filter: brightness(.96); }
+.paski { display: flex; flex-wrap: wrap; gap: 6px; }
+
+table.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabela th { text-align: left; font-weight: 500; color: var(--drugi); font-size: 12.5px; padding: 6px 8px; border-bottom: 1px solid var(--linia-mocna); }
+.tabela td { padding: 8px; border-bottom: 1px solid var(--linia); vertical-align: middle; }
+.tabela tr:last-child td { border-bottom: none; }
+.tabela tr.klik:hover td { background: var(--tlo); cursor: pointer; }
+.tabela .liczba { text-align: right; font-variant-numeric: tabular-nums; }
+.przewijanie { overflow-x: auto; }
+
+button, .przycisk { font: inherit; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--promien); border: 1px solid var(--linia-mocna); background: var(--karta);
+  color: var(--tekst); cursor: pointer; text-decoration: none; }
+button:hover, .przycisk:hover { background: var(--tlo); text-decoration: none; }
+button.glowny, .przycisk.glowny { background: var(--akcent); border-color: var(--akcent); color: var(--akcent-tekst); }
+button.glowny:hover, .przycisk.glowny:hover { filter: brightness(1.08); background: var(--akcent); }
+button.niebezpieczny { color: var(--czerwony); border-color: var(--czerwony-tlo); }
+button.maly, .przycisk.maly { padding: 3px 9px; font-size: 13px; }
+button.link { border: none; background: none; color: var(--drugi); padding: 0; }
+button[disabled] { opacity: .6; cursor: progress; }
+.przyciski { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+form.w-linii { display: inline; }
+
+.formularz > div, .formularz p { margin-bottom: 12px; }
+.formularz label { display: block; font-size: 13px; color: var(--drugi); margin-bottom: 4px; }
+.formularz input[type=checkbox] + label, .formularz label:has(input[type=checkbox]) { display: inline; }
+input[type=text], input[type=password], input[type=number], input[type=datetime-local], input[type=url],
+input[type=email], input[type=search], select, textarea {
+  font: inherit; width: 100%; max-width: 560px; padding: 7px 10px; border: 1px solid var(--linia-mocna);
+  border-radius: var(--promien); background: var(--karta); color: var(--tekst); }
+textarea { max-width: 100%; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--akcent-tlo); border-color: var(--akcent); }
+.helptext, .pomoc { display: block; font-size: 12.5px; color: var(--slaby); margin-top: 3px; }
+.errorlist { list-style: none; margin: 4px 0; padding: 0; color: var(--czerwony); font-size: 13px; }
+
+.komunikaty { list-style: none; padding: 0; margin: 0 0 16px; }
+.komunikaty li { padding: 9px 12px; border-radius: var(--promien); margin-bottom: 6px; background: var(--niebieski-tlo); color: var(--niebieski); }
+.komunikaty li.success { background: var(--zielony-tlo); color: var(--zielony); }
+.komunikaty li.warning { background: var(--zolty-tlo); color: var(--zolty); }
+.komunikaty li.error { background: var(--czerwony-tlo); color: var(--czerwony); }
+
+.kopiuj { display: flex; gap: 6px; align-items: center; }
+.kopiuj input { font-family: var(--mono); font-size: 13px; }
+.opis-pola { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 6px 12px; font-size: 14px; }
+.opis-pola dt { color: var(--drugi); }
+.opis-pola dd { margin: 0; overflow-wrap: anywhere; }
+.puste { color: var(--slaby); padding: 18px 0; text-align: center; }
+.uwaga { background: var(--zolty-tlo); color: var(--zolty); border-radius: var(--promien); padding: 9px 12px; margin-bottom: 12px; }
+.blad-tekst { color: var(--czerwony); font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; }
+.slabe { color: var(--slaby); }
+.nowrap { white-space: nowrap; }
+.tabela select { min-width: 170px; }
+.formularz input[type=checkbox] { margin: 4px 0; width: 18px; height: 18px; }
+.drugie { color: var(--drugi); }
+.male { font-size: 12.5px; }
+details summary { cursor: pointer; color: var(--drugi); }
+
+/* Strony studenta */
+.student-tlo { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; }
+.student-karta { background: var(--karta); border: 1px solid var(--linia); border-radius: 14px; padding: 26px 28px; width: 100%; max-width: 560px; }
+.student-karta .kroki { padding-left: 20px; margin: 8px 0 14px; }
+.student-karta .kroki li { margin-bottom: 8px; }
+.student-stopka { font-size: 12.5px; color: var(--slaby); margin-top: 18px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }

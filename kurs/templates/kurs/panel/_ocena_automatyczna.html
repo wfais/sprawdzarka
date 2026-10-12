@@ -1,0 +1,105 @@
+<div class="karta" id="ocena-automatyczna">
+  <div class="naglowek" style="margin-bottom:8px">
+    <h2 style="margin:0">Ocena automatyczna</h2>
+    {% if z.status == Status.GOTOWE and z.sha_oceniany %}
+    <form method="post" action="{% url 'panel:zgloszenie_ocen' z.pk %}" class="w-linii">{% csrf_token %}
+      {% if ewaluacja %}<input type="hidden" name="wymus" value="1">{% endif %}
+      <button type="submit" class="maly" data-czekaj="Uruchamiam">{% if ewaluacja %}Oceń ponownie{% else %}Oceń automatycznie{% endif %}</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not ewaluacja %}
+    <p class="slabe">{% if z.sha_oceniany %}Jeszcze nie oceniono. Ocena uruchamia testy i modele językowe.{% else %}Brak oddanego kodu.{% endif %}</p>
+  {% elif ewaluacja.w_toku %}
+    <p><span class="znacznik niebieski">{{ ewaluacja.get_status_display }}</span> Trwa ocena. Strona odświeża się sama.</p>
+  {% elif ewaluacja.status == "blad" %}
+    <p><span class="znacznik czerwony">błąd</span></p>
+    <p class="blad-tekst">{{ ewaluacja.blad_opis }}</p>
+  {% else %}
+    <p class="male drugie">
+      Stan <a class="mono" href="{{ z.url_repo }}/tree/{{ ewaluacja.sha }}" target="_blank" rel="noopener">{{ ewaluacja.sha|slice:":10" }}</a>
+      · {{ ewaluacja.zakonczono|date:"d.m.Y H:i" }}
+      {% if ewaluacja.tokeny_we %}· tokeny {{ ewaluacja.tokeny_we }} + {{ ewaluacja.tokeny_wy }}{% endif %}
+      {% if liczba_ewaluacji > 1 %}· oceniano {{ liczba_ewaluacji }} razy{% endif %}
+      {% if ewaluacja.zatwierdzona %}<span class="znacznik szary">zatwierdzona{% if ewaluacja.automatycznie %} automatycznie{% endif %}</span>{% endif %}
+    </p>
+    {% if ewaluacja.sha != z.sha_oceniany %}<div class="uwaga">Ocena dotyczy innego stanu niż obecnie oceniany ({{ z.sha_oceniany|slice:":10" }}). Rozważ ponowną ocenę.</div>{% endif %}
+    {% if ewaluacja.podejrzane %}<div class="uwaga"><strong>Podejrzane treści:</strong><div class="blad-tekst" style="color:inherit">{{ ewaluacja.podejrzane }}</div></div>{% endif %}
+
+    <p>
+      {% if testy.uruchomiono %}
+        Testy: <strong>{{ testy.zdane }} / {{ testy.wszystkie }}</strong> zaliczonych{% if testy.przekroczono_czas %} <span class="znacznik czerwony">przekroczony czas</span>{% endif %}
+        <span class="male slabe">({{ testy.czas }} s; kod studenta działa w tym samym procesie co testy, więc wynik jest pomocniczy)</span>
+      {% else %}
+        <span class="drugie">Testy nie zostały uruchomione: {{ testy.powod|default:testy.blad }}</span>
+      {% endif %}
+    </p>
+    {% if testy.uruchomiono %}
+    <details style="margin-bottom:12px"><summary>Szczegóły testów</summary>
+      <table class="tabela male" style="margin-top:6px">
+        {% for t in testy.przypadki %}
+        <tr><td class="mono">{{ t.plik }}::{{ t.nazwa }}</td>
+          <td>{% if t.wynik == "zdany" %}<span class="znacznik zielony">zdany</span>{% elif t.wynik == "pominiety" %}<span class="znacznik szary">pominięty</span>{% else %}<span class="znacznik czerwony">{{ t.wynik }}</span>{% endif %}</td></tr>
+        {% if t.komunikat and t.wynik != "zdany" %}<tr><td colspan="2"><div class="blad-tekst">{{ t.komunikat|truncatechars:800 }}</div></td></tr>{% endif %}
+        {% endfor %}
+      </table>
+      <pre class="blad-tekst" style="color:var(--drugi);max-height:260px;overflow:auto">{{ testy.dziennik }}</pre>
+    </details>
+    {% endif %}
+
+    <form method="post" action="{% url 'panel:ewaluacja_zatwierdz' ewaluacja.pk %}"
+          data-potwierdz="Wysłać ocenę do pull requestu i zamknąć go?">{% csrf_token %}
+      <div class="przewijanie">
+      <table class="tabela">
+        <tr><th>Zadanie</th><th class="liczba">Testy</th>
+          {% for m in modele_tabeli %}<th class="liczba nowrap" title="{{ m.0 }}">{{ m.1|truncatechars:24 }}</th>{% endfor %}
+          <th class="liczba">Konsensus</th><th class="liczba">Ocena</th></tr>
+        {% for w in wiersze %}{% with o=w.ocena %}
+        <tr>
+          <td><strong>{{ o.kod }}</strong> <span class="slabe male">/ {{ o.punkty_max|floatformat:"-2" }}</span>
+            {% if o.sporne %}<span class="znacznik zolty">sporne</span>{% endif %}
+            {% if o.tryb == "recznie" %}<span class="znacznik fiolet">ręcznie</span>{% endif %}</td>
+          <td class="liczba">{% if o.testy_wszystkie %}{{ o.testy_zdane }}/{{ o.testy_wszystkie }}{% else %}<span class="slabe">-</span>{% endif %}</td>
+          {% for k in w.komorki %}
+          <td class="liczba" title="{{ k.uzasadnienie }}">{% if k.blad %}<span class="znacznik czerwony">błąd</span>{% elif k.punkty is not None %}{{ k.punkty|floatformat:"-2" }}{% if k.poprzednio is not None and k.poprzednio != k.punkty %} <span class="slabe male">(było {{ k.poprzednio|floatformat:"-2" }})</span>{% endif %}{% else %}<span class="slabe">-</span>{% endif %}</td>
+          {% endfor %}
+          <td class="liczba">{% if o.punkty_konsensus is not None %}{{ o.punkty_konsensus|floatformat:"-2" }}{% else %}<span class="slabe">-</span>{% endif %}</td>
+          <td class="liczba"><input type="text" inputmode="decimal" name="pkt_{{ o.pk }}" style="width:70px;text-align:right"
+                value="{% if o.punkty_koncowe is not None %}{{ o.punkty_koncowe|floatformat:'-2' }}{% endif %}"></td>
+        </tr>
+        <tr><td colspan="{{ modele_tabeli|length|add:4 }}" style="padding-top:0">
+          <details><summary class="male">Uzasadnienia{% if o.sporne %} i reguła na przyszłość{% endif %}</summary>
+            {% for k in w.komorki %}{% if k.uzasadnienie %}<p class="male"><span class="mono">{{ k.model }}</span>: {{ k.uzasadnienie }}</p>{% endif %}{% endfor %}
+            <label class="male drugie">Reguła dla kolejnych ocen (opcjonalnie, np. „brak obsługi pustej listy: minus 0,25 pkt”)</label>
+            <textarea name="prec_{{ o.pk }}" rows="2" placeholder="Zostaw puste, jeśli nie chcesz dodawać reguły"></textarea>
+          </details>
+        </td></tr>
+        {% endwith %}{% endfor %}
+      </table>
+      </div>
+      <div class="formularz" style="margin-top:12px">
+        <div><label for="mnoznik">Mnożnik terminu</label>
+          <input id="mnoznik" type="text" inputmode="decimal" name="mnoznik" style="width:90px" value="{{ mnoznik_domyslny|floatformat:'-2' }}">
+          <span class="pomoc">Sugestia z terminów: {% if z.sugerowany_mnoznik is not None %}{{ z.sugerowany_mnoznik|floatformat:"-2" }}{% else %}brak{% endif %}.</span></div>
+        <div><label for="komentarz-ew">Komentarz dla studenta (trafi do pull requestu)</label>
+          <textarea id="komentarz-ew" name="komentarz" rows="6">{{ ewaluacja.komentarz }}</textarea></div>
+        <div><label class="male"><input type="checkbox" name="uwagi" value="1"> dodaj uwagi modeli przy liniach kodu (gdy GitHub ich nie przyjmie, trafią do komentarza)</label></div>
+      </div>
+      <div class="przyciski">
+        <button class="glowny" type="submit" data-czekaj="Wysyłam">Zatwierdź i zamknij z oceną</button>
+        <button type="submit" name="nastepny" value="przydzial" data-czekaj="Wysyłam">Zatwierdź i wróć do listy</button>
+      </div>
+    </form>
+
+    {% if opinie %}
+    <details style="margin-top:12px"><summary>Surowe odpowiedzi modeli</summary>
+      {% for o in opinie %}
+      <div style="margin-top:8px"><span class="mono">{{ o.model }}</span> runda {{ o.runda }}
+        {% if o.ok %}<span class="slabe male">{{ o.czas_s|floatformat:1 }} s, tokeny {{ o.tokeny_we }} + {{ o.tokeny_wy }}</span>{% else %}<span class="znacznik czerwony">błąd</span>{% endif %}
+        <pre class="blad-tekst" style="color:var(--drugi);max-height:220px;overflow:auto">{% if o.ok %}{{ o.surowa|default:o.dane }}{% else %}{{ o.blad }}{% endif %}</pre></div>
+      {% endfor %}
+    </details>
+    {% endif %}
+  {% endif %}
+</div>

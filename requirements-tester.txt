@@ -1,0 +1,3 @@
+# Biblioteki dostepne dla kodu studentow podczas testow (proces testujacy).
+# Dopisz tu biblioteki, z ktorych korzystaja zadania, np. numpy.
+pytest>=8

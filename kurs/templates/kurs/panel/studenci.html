@@ -1,0 +1,42 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Studenci{% endblock %}
+{% block tresc %}
+<div class="naglowek">
+  <div><h1>Studenci</h1><p class="podtytul">Powiązanie kont GitHub z osobami. Wpis zrobiony raz obowiązuje we wszystkich zestawach.</p></div>
+  <form method="get" class="przyciski">
+    <input type="search" name="q" value="{{ q }}" placeholder="Szukaj loginu lub nazwiska" style="width:240px">
+    <label class="male"><input type="checkbox" name="filtr" value="bez" {% if filtr == "bez" %}checked{% endif %} onchange="this.form.submit()"> tylko bez nazwiska</label>
+  </form>
+</div>
+<div class="karta przewijanie">
+  <table class="tabela">
+    <tr><th>Konto</th><th>Imię i nazwisko</th><th>Źródło</th><th>Kandydat z README</th><th class="liczba">Zestawy</th></tr>
+    {% for s in studenci %}
+    <tr>
+      <td class="mono"><a href="https://github.com/{{ s.login }}" target="_blank" rel="noopener">{{ s.login }}</a></td>
+      <td>
+        <form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski">{% csrf_token %}
+          <input type="text" name="imie_nazwisko" value="{{ s.imie_nazwisko }}" style="width:220px" placeholder="nieustalone">
+          <input type="hidden" name="nastepny" value="{{ request.get_full_path }}">
+          <button class="maly" type="submit">Zapisz</button>
+        </form>
+      </td>
+      <td class="male drugie">{{ s.get_zrodlo_nazwiska_display }}</td>
+      <td>
+        {% if s.kandydat_readme and not s.imie_nazwisko %}
+        <form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski">{% csrf_token %}
+          <input type="hidden" name="nastepny" value="{{ request.get_full_path }}">
+          <span>{{ s.kandydat_readme }}</span>
+          <button class="maly" name="akcja" value="zatwierdz">Zatwierdź</button>
+          <button class="maly" name="akcja" value="odrzuc">Odrzuć</button>
+        </form>
+        {% endif %}
+      </td>
+      <td class="liczba">{{ s.liczba }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="puste">Brak studentów.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

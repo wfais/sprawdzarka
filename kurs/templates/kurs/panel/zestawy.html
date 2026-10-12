@@ -1,0 +1,26 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Zestawy{% endblock %}
+{% block tresc %}
+<div class="naglowek">
+  <div><h1>Zestawy</h1><p class="podtytul">Zestaw to Twoje repozytorium źródłowe z zadaniami. Wydajesz go grupom na stronie zestawu.</p></div>
+  <a class="przycisk glowny" href="{% url 'panel:zestaw_nowy' %}">Nowy zestaw</a>
+</div>
+<div class="karta przewijanie">
+  <table class="tabela">
+    <tr><th>Skrót</th><th>Nazwa</th><th>Repozytorium źródłowe</th><th>Kod</th><th class="liczba">Punkty</th><th class="liczba">Grupy</th><th>PDF</th></tr>
+    {% for z in zestawy %}
+    <tr class="klik" data-href="{% url 'panel:zestaw' z.pk %}">
+      <td><code>{{ z.skrot }}</code></td>
+      <td><a href="{% url 'panel:zestaw' z.pk %}">{{ z.nazwa }}</a></td>
+      <td class="mono">{{ z.repo_zrodlowe }}</td>
+      <td class="mono">{{ z.wzorce_kodu }}</td>
+      <td class="liczba">{{ z.punkty_max|floatformat:"-2" }}</td>
+      <td class="liczba">{{ z.liczba_grup }}</td>
+      <td>{% if z.tresc_pdf %}<a href="{% url 'panel:zestaw_pdf' z.pk %}">otwórz</a>{% else %}<span class="slabe">brak</span>{% endif %}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="puste">Brak zestawów.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

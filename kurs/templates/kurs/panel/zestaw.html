@@ -1,0 +1,74 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}{{ zestaw.nazwa }}{% endblock %}
+{% block tresc %}
+<div class="okruszki"><a href="{% url 'panel:zestawy' %}">Zestawy</a></div>
+<div class="naglowek">
+  <div><h1>{{ zestaw.nazwa }}</h1>
+    <p class="podtytul">Źródło: <a class="mono" href="https://github.com/{{ zestaw.repo_zrodlowe }}" target="_blank" rel="noopener">{{ zestaw.repo_zrodlowe }}</a>
+      · kod: <code>{{ zestaw.wzorce_kodu }}</code> · {{ zestaw.punkty_max|floatformat:"-2" }} pkt
+      {% if zestaw.tresc_pdf %}· <a href="{% url 'panel:zestaw_pdf' zestaw.pk %}">treść PDF</a>{% endif %}</p>
+  </div>
+  <div class="przyciski">{% block akcje_zestawu %}{% endblock %}<a class="przycisk" href="{% url 'panel:zestaw_edycja' zestaw.pk %}">Edytuj zestaw</a></div>
+</div>
+
+<div class="siatka-2">
+  <div class="karta">
+    <h2>Wydany grupom</h2>
+    <table class="tabela">
+      <tr><th>Grupa</th><th>Termin</th><th>Ostateczny</th><th>Stan</th></tr>
+      {% for p in przydzialy %}
+      <tr class="klik" data-href="{% url 'panel:przydzial' p.pk %}">
+        <td class="nowrap"><a href="{% url 'panel:przydzial' p.pk %}">{{ p.grupa.nazwa }}</a></td>
+        <td class="nowrap">{{ p.termin_miekki|date:"d.m.Y H:i" }}</td>
+        <td class="nowrap">{{ p.termin_twardy|date:"d.m.Y H:i" }}</td>
+        <td>{% include "kurs/panel/_paski.html" %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="puste">Zestaw nie został jeszcze wydany żadnej grupie.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="karta">
+    <h2>Wydaj grupie</h2>
+    <p class="drugie male">Powstanie repozytorium startowe grupy (kopia źródła bez historii) i link dla studentów.</p>
+    <form method="post" class="formularz">{% csrf_token %}
+      {{ formularz.as_div }}
+      <button class="glowny" type="submit" data-czekaj="Tworzę repozytorium startowe">Wydaj zestaw</button>
+    </form>
+  </div>
+</div>
+<div class="karta">
+  <div class="naglowek" style="margin-bottom:10px">
+    <div>
+      <h2 style="margin:0">Zadania i kryteria oceny</h2>
+      <p class="drugie male" style="margin:4px 0 0">Na tej podstawie działają testy i modele oceniające.
+        Modele: {% for m in modele %}<code>{{ m.identyfikator }}</code>{% if not forloop.last %}, {% endif %}{% empty %}<span class="slabe">żaden nie jest skonfigurowany (ocena tylko z testów)</span>{% endfor %}.
+        {% if zestaw.auto_zamykanie %}<span class="znacznik fiolet">zgodne oceny zamykane automatycznie</span>{% endif %}</p>
+    </div>
+    <div class="przyciski">
+      {% if zestaw.tresc_pdf %}
+      <form method="post" action="{% url 'panel:zestaw_tekst_z_pdf' zestaw.pk %}" class="w-linii">{% csrf_token %}
+        <button type="submit" class="maly">Odczytaj tekst z PDF</button></form>
+      {% endif %}
+      <form method="post" action="{% url 'panel:zestaw_zaproponuj' zestaw.pk %}" class="w-linii"
+            {% if zadania %}data-potwierdz="Zastąpić obecne zadania propozycją modelu?"{% endif %}>{% csrf_token %}
+        <button type="submit" class="maly" data-czekaj="Model czyta treść">Zaproponuj z treści</button></form>
+      <a class="przycisk maly glowny" href="{% url 'panel:zestaw_zadania' zestaw.pk %}">Edytuj zadania</a>
+    </div>
+  </div>
+  {% if not zestaw.tresc_tekst %}<div class="uwaga">Brak treści zestawu jako tekstu. Dodaj PDF albo wpisz treść w edycji zestawu: modele oceniają według niej.</div>{% endif %}
+  {% if zadania %}
+  {% if suma_zadan != zestaw.punkty_max %}<div class="uwaga">Suma punktów zadań ({{ suma_zadan|floatformat:"-2" }}) różni się od punktów zestawu ({{ zestaw.punkty_max|floatformat:"-2" }}).</div>{% endif %}
+  <table class="tabela">
+    <tr><th>Zadanie</th><th>Katalog</th><th class="liczba">Punkty</th><th>Sposób oceny</th><th>Kryteria</th></tr>
+    {% for z in zadania %}
+    <tr><td><strong>{{ z.kod }}</strong></td><td class="mono">{{ z.katalog|default:"całe repozytorium" }}</td>
+      <td class="liczba">{{ z.punkty|floatformat:"-2" }}</td><td class="male">{{ z.get_tryb_display }}</td>
+      <td class="male drugie">{{ z.kryteria|truncatechars:180 }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="slabe">Brak zadań. Kliknij „Zaproponuj z treści” (model odczyta PDF) albo dodaj je ręcznie.</p>
+  {% endif %}
+</div>
+{% endblock %}

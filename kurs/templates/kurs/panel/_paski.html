@@ -1,0 +1,6 @@
+<div class="paski">
+  {% for kolor, etykieta, n in p.paski %}<a class="znacznik {{ kolor }}" href="{% url 'panel:przydzial' p.pk %}?kolor={{ kolor }}">{{ etykieta }} {{ n }}</a>{% endfor %}
+  {% if p.problemy %}<a class="znacznik czerwony" href="{% url 'panel:przydzial' p.pk %}?kolor=problemy">problemy {{ p.problemy }}</a>{% endif %}
+  {% if p.testy %}<a class="znacznik czerwony" href="{% url 'panel:przydzial' p.pk %}?kolor=testy" title="studenci, którzy zmienili pliki testów">zmienione testy {{ p.testy }}</a>{% endif %}
+  {% if not p.lacznie %}<span class="slabe male">nikt jeszcze nie zaakceptował</span>{% endif %}
+</div>

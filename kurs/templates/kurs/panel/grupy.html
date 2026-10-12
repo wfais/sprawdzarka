@@ -1,0 +1,29 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Grupy{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Grupy</h1><p class="podtytul">Każda grupa ma własne terminy i własne linki do zestawów.</p></div></div>
+<div class="siatka-2">
+  <div class="karta">
+    <table class="tabela">
+      <tr><th>Nazwa</th><th>Skrót</th><th>Opis</th><th class="liczba">Zestawy</th><th></th></tr>
+      {% for g in grupy %}
+      <tr>
+        <td>{{ g.nazwa }}{% if not g.aktywna %} <span class="znacznik szary">nieaktywna</span>{% endif %}</td>
+        <td><code>{{ g.skrot }}</code></td><td class="drugie">{{ g.opis }}</td>
+        <td class="liczba">{{ g.liczba_zestawow }}</td>
+        <td><a class="przycisk maly" href="{% url 'panel:grupa_edycja' g.pk %}">Edytuj</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="puste">Brak grup.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="karta">
+    <h2>Nowa grupa</h2>
+    <form method="post" class="formularz">{% csrf_token %}
+      {{ formularz.as_div }}
+      <button class="glowny" type="submit">Dodaj grupę</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

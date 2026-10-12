@@ -1,0 +1,38 @@
+{% load static %}<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% block naglowek_strony %}{% endblock %}
+<title>{% block tytul %}Panel{% endblock %} · Sprawdzarka</title>
+<link rel="stylesheet" href="{% static 'kurs/styl.css' %}">
+</head>
+<body>
+<header class="pasek">
+  <a class="logo" href="{% url 'panel:pulpit' %}">Sprawdzarka</a>
+  {% if user.is_authenticated %}
+  <nav>
+    {% with sciezka=request.path %}
+    <a href="{% url 'panel:pulpit' %}" {% if sciezka == '/panel/' %}class="aktywny"{% endif %}>Pulpit</a>
+    <a href="{% url 'panel:zestawy' %}" {% if '/panel/zestawy' in sciezka or '/panel/przydzialy' in sciezka %}class="aktywny"{% endif %}>Zestawy</a>
+    <a href="{% url 'panel:grupy' %}" {% if '/panel/grupy' in sciezka %}class="aktywny"{% endif %}>Grupy</a>
+    <a href="{% url 'panel:studenci' %}" {% if '/panel/studenci' in sciezka %}class="aktywny"{% endif %}>Studenci</a>
+    <a href="{% url 'panel:kalibracja' %}" {% if '/panel/kalibracja' in sciezka %}class="aktywny"{% endif %}>Kalibracja</a>
+    <a href="{% url 'panel:modele' %}" {% if '/panel/modele' in sciezka %}class="aktywny"{% endif %}>Modele</a>
+    <a href="{% url 'admin:index' %}">Administracja</a>
+    {% endwith %}
+  </nav>
+  <form method="post" action="{% url 'panel:wyloguj' %}" class="w-linii">{% csrf_token %}
+    <button class="link" type="submit">Wyloguj ({{ user.get_username }})</button>
+  </form>
+  {% endif %}
+</header>
+<main class="tresc">
+  {% if messages %}
+  <ul class="komunikaty">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% block tresc %}{% endblock %}
+</main>
+<script src="{% static 'kurs/panel.js' %}"></script>
+</body>
+</html>

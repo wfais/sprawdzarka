@@ -1,0 +1,15 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}{{ tytul }}{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>{{ tytul }}</h1></div></div>
+<div class="karta" style="max-width:720px">
+  <form method="post" class="formularz" {% if pliki %}enctype="multipart/form-data"{% endif %}>{% csrf_token %}
+    {{ formularz.as_div }}
+    <div class="przyciski">
+      <button class="glowny" type="submit">{{ przycisk }}</button>
+      {% if wstecz %}<a class="przycisk" href="{% url wstecz %}">Anuluj</a>{% endif %}
+      {% if wstecz_obiekt %}<a class="przycisk" href="javascript:history.back()">Anuluj</a>{% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}
