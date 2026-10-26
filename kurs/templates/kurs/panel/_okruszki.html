@@ -1,0 +1,12 @@
+{% with r1=kurs.rok r2=rok %}{% with r=r1|default:r2 %}
+<div class="okruszki"><a href="{% url 'panel:struktura' %}">Struktura</a>
+  › {{ r.uczelnia.skrot|upper }}
+  {% if not tylko_uczelnia %}› <a href="{% url 'panel:rok' r.pk %}">{{ r.nazwa }}</a>{% endif %}
+  {% if kurs and not bez_kursu %}› <a href="{% url 'panel:kurs' kurs.pk %}">{{ kurs.nazwa }}</a>{% endif %}
+  {% if grupa %}› <a href="{% url 'panel:grupa' grupa.pk %}">{{ grupa.nazwa }}</a>{% endif %}
+  {% if zestaw %}› <a href="{% url 'panel:zestaw' zestaw.pk %}">{{ zestaw.nazwa }}</a>{% endif %}
+  {% if przydzial %}› <a href="{% url 'panel:przydzial' przydzial.pk %}">{{ przydzial.zestaw.nazwa }}</a>{% endif %}
+  {% if r.poligon %}<span class="znacznik zolty">poligon</span>{% endif %}
+  {% if r.zarchiwizowany and not bez_znacznikow %}<span class="znacznik szary">rok zarchiwizowany</span>{% endif %}
+</div>
+{% endwith %}{% endwith %}

@@ -1,0 +1,42 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Kopiuj: {{ przydzial }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with kurs=kurs grupa=przydzial.grupa przydzial=przydzial only %}
+<div class="naglowek"><div>
+  <h1>Kopiuj do innych grup</h1>
+  <p class="podtytul">{% if przydzial.zestaw.kolokwium %}Kolokwium{% else %}Zestaw{% endif %} <strong>{{ przydzial.zestaw.nazwa }}</strong>
+    z grupy {{ przydzial.grupa.nazwa }}. Każda zaznaczona grupa dostanie własne repozytorium startowe i własny link.
+    Terminy, przedrostek i ewentualnie inne repozytorium źródłowe ustawiasz w wierszu grupy.</p>
+</div></div>
+<div class="karta przewijanie tabela-formularz">
+{% if wiersze %}
+  <form method="post">{% csrf_token %}
+    {{ zestaw_formularzy.management_form }}
+    {% if zestaw_formularzy.non_form_errors %}<div class="blad-tekst">{{ zestaw_formularzy.non_form_errors }}</div>{% endif %}
+    <table class="tabela">
+      <tr><th><input type="checkbox" data-zaznacz-wszystkie=".wybor-grupy" title="zaznacz wszystkie"></th>
+        <th>Grupa</th><th title="puste: od razu">Publikacja</th><th>Termin</th><th>Termin ostateczny</th><th>Przedrostek repozytoriów i źródło</th></tr>
+      {% for grupa, f in wiersze %}
+      <tr>
+        <td>{{ f.grupa }}{{ f.wybrana }}</td>
+        <td><label class="nowrap" for="{{ f.wybrana.id_for_label }}">{{ grupa.nazwa }}</label>{% if grupa.opis %}<div class="male drugie">{{ grupa.opis }}</div>{% endif %}</td>
+        <td>{{ f.publikacja }}{{ f.publikacja.errors }}</td>
+        <td>{{ f.termin_miekki }}{{ f.termin_miekki.errors }}</td>
+        <td>{{ f.termin_twardy }}{{ f.termin_twardy.errors }}</td>
+        <td class="pola-repo">{{ f.przedrostek_repo }}{{ f.przedrostek_repo.errors }}{{ f.repo_zrodlowe }}{{ f.repo_zrodlowe.errors }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="drugie male">Pusta publikacja: link działa od razu. Puste drugie pole (inne repozytorium źródłowe): repozytorium zestawu <span class="mono">{{ przydzial.zestaw.repo_zrodlowe }}</span>.
+      Ustawienia „przyjmuje zgłoszenia” i „oceniaj automatycznie” są kopiowane z grupy {{ przydzial.grupa.nazwa }}.</p>
+    <div class="przyciski">
+      <button class="glowny" type="submit" data-czekaj="Tworzę repozytoria startowe">Wydaj zaznaczonym grupom</button>
+      <a class="przycisk" href="{% url 'panel:przydzial' przydzial.pk %}">Anuluj</a>
+    </div>
+  </form>
+{% else %}
+  <p class="puste">Wszystkie aktywne grupy tego przedmiotu mają już ten zestaw. Nową grupę dodasz na stronie
+    przedmiotu <a href="{% url 'panel:kurs' kurs.pk %}">{{ kurs.nazwa }} {{ kurs.rok.nazwa }}</a>.</p>
+{% endif %}
+</div>
+{% endblock %}

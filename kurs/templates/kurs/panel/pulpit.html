@@ -2,56 +2,60 @@
 {% block tytul %}Pulpit{% endblock %}
 {% block tresc %}
 <div class="naglowek">
-  <div><h1>Pulpit</h1><p class="podtytul">Grupy, wydane zestawy i stan oddawania.</p></div>
-  <div class="przyciski">
-    <a class="przycisk" href="{% url 'panel:grupy' %}">Grupy</a>
-    <a class="przycisk glowny" href="{% url 'panel:zestaw_nowy' %}">Nowy zestaw</a>
-  </div>
+  <div><h1>Pulpit</h1>
+    <p class="podtytul">Bieżące przedmioty, grupy i stan oddawania.{% if ukrytych %}
+      Przedmioty ukryte i z lat zarchiwizowanych ({{ ukrytych }}) są w <a href="{% url 'panel:struktura' %}">strukturze</a>.{% endif %}</p></div>
+  <div class="przyciski"><a class="przycisk" href="{% url 'panel:struktura' %}">Struktura</a></div>
 </div>
 
-{% if brak_grup or brak_zestawow %}
+{% if brak_kursow %}
 <div class="karta">
   <h2>Pierwsze kroki</h2>
   <ol>
-    <li>{% if brak_grup %}<a href="{% url 'panel:grupy' %}">Dodaj grupy</a>, np. „Grupa 4” ze skrótem g4.{% else %}Grupy dodane.{% endif %}</li>
-    <li>{% if brak_zestawow %}<a href="{% url 'panel:zestaw_nowy' %}">Dodaj zestaw</a>: wskaż swoje repozytorium z zadaniami w organizacji.{% else %}Zestawy dodane.{% endif %}</li>
-    <li>Na stronie zestawu wydaj go grupom z terminami. Każda grupa dostanie własny link i własne repozytorium startowe.</li>
+    <li>W <a href="{% url 'panel:struktura' %}">strukturze</a> dodaj rok akademicki (np. 2026/2027), a na jego stronie przedmiot (np. „Język Python”).</li>
+    <li>Na stronie przedmiotu dodaj grupy (np. „Grupa nr 3” ze skrótem g3) oraz zestawy zadań i kolokwia.</li>
+    <li>Wydaj zestaw grupie z terminami. Każda grupa dostanie własny link i własne repozytorium startowe.
+      Tym samym zestawem z innymi terminami obdzielisz kolejne grupy przyciskiem „Kopiuj do innych grup”.</li>
     <li>Link wyślij studentom (Pegaz, e-mail, ogłoszenie).</li>
   </ol>
 </div>
 {% endif %}
 
-{% if bledy or kandydaci %}
+{% if bledy or kandydaci or zalegle %}
 <div class="karta">
   <h2>Wymaga uwagi</h2>
+  {% for p in zalegle %}
+    <p><span class="stan"><i class="dioda fiolet pulsuje" aria-hidden="true"></i><a href="{% url 'panel:przydzial' p.pk %}?stan=do_oceny">{{ p.grupa.nazwa }}: {{ p.zestaw.nazwa }}</a></span>
+      <span class="drugie">czeka na oceny ({{ p.do_oceny }}) od {{ p.termin_twardy|date:"d.m" }}</span></p>
+  {% endfor %}
   {% if kandydaci %}<p><a href="{% url 'panel:studenci' %}?filtr=bez">Imiona i nazwiska do zatwierdzenia z README: {{ kandydaci }}</a></p>{% endif %}
   {% for z in bledy %}
-    <p><span class="znacznik czerwony">błąd tworzenia</span> <a href="{% url 'panel:zgloszenie' z.pk %}">{{ z.student }}, {{ z.przydzial }}</a></p>
+    <p><span class="stan"><i class="dioda czerwony" aria-hidden="true"></i><a href="{% url 'panel:zgloszenie' z.pk %}">{{ z.student }}, {{ z.przydzial }}</a></span> <span class="drugie">błąd tworzenia repozytorium</span></p>
   {% endfor %}
 </div>
 {% endif %}
 
-<div class="siatka">
-{% for grupa in grupy %}
-  <section class="karta">
-    <div class="naglowek" style="margin-bottom:8px">
-      <h2 style="margin:0">{{ grupa.nazwa }}</h2>
-      <span class="slabe male">{{ grupa.opis }}</span>
+{% for kurs in kursy %}
+<section class="sekcja-roku{% if kurs.rok.poligon %} poligon{% endif %}">
+  <div class="naglowek">
+    <div>
+      <h2><span class="plakietka" title="{{ kurs.rok.uczelnia.nazwa }}">{{ kurs.rok.uczelnia.skrot|upper }}</span><a href="{% url 'panel:kurs' kurs.pk %}">{{ kurs.nazwa }}</a> <a class="rok-w-tytule" href="{% url 'panel:rok' kurs.rok_id %}">{{ kurs.rok.nazwa }}</a></h2>
+      <p><span>{{ kurs.rok.uczelnia.nazwa }}</span>{% if kurs.kod %}<span class="kod-przedmiotu">{{ kurs.kod }}</span>{% endif %}{% if kurs.rok.poligon %}<span class="znacznik zolty">poligon: dane fikcyjne</span>{% endif %}</p>
     </div>
-    {% for p in grupa.lista %}
-      <div style="padding:10px 0;border-top:1px solid var(--linia)">
-        <div style="margin-bottom:6px">
-          <a href="{% url 'panel:przydzial' p.pk %}"><strong>{{ p.zestaw.nazwa }}</strong></a>
-          <div class="male drugie">termin {{ p.termin_miekki|date:"d.m.Y H:i" }} · ostateczny {{ p.termin_twardy|date:"d.m.Y H:i" }}{% if not p.otwarty %} · zamknięty{% endif %}</div>
-        </div>
-        {% include "kurs/panel/_paski.html" %}
-      </div>
-    {% empty %}
-      <p class="slabe">Brak wydanych zestawów.</p>
-    {% endfor %}
-  </section>
+    <div class="przyciski">
+      <a class="przycisk maly" href="{% url 'panel:zestaw_nowy' kurs.pk %}">Nowy zestaw</a>
+      <a class="przycisk maly" href="{% url 'panel:zestaw_nowy' kurs.pk %}?rodzaj=kolokwium">Nowe kolokwium</a>
+    </div>
+  </div>
+  <div class="siatka">
+  {% for grupa in kurs.lista_grup %}
+    {% include "kurs/panel/_karta_grupy.html" %}
+  {% empty %}
+    <p class="slabe">Brak aktywnych grup. <a href="{% url 'panel:kurs' kurs.pk %}">Dodaj grupy</a></p>
+  {% endfor %}
+  </div>
+</section>
 {% empty %}
-  {% if not brak_grup %}<p class="puste">Brak aktywnych grup.</p>{% endif %}
+  {% if not brak_kursow %}<p class="puste">Wszystkie przedmioty są ukryte albo zarchiwizowane. <a href="{% url 'panel:struktura' %}">Struktura</a></p>{% endif %}
 {% endfor %}
-</div>
 {% endblock %}

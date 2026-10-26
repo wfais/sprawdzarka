@@ -49,6 +49,7 @@ robot co kilka minut sam pobiera historię wypchnięć z GitHuba.
 | Pull requests | Read and write | pull request „Feedback”, uwagi do linii kodu |
 | Issues | Read and write | komentarz z oceną w pull requeście |
 | Metadata | Read-only | wymagane zawsze (ustawia się samo) |
+| Workflows | Read and write | **tylko** jeśli któryś zestaw ma włączone „kopiuj konfigurację GitHub Actions” |
 
 **Organization permissions** i **Account permissions**: bez zmian (brak dostępu).
 
@@ -58,7 +59,10 @@ Zaznacz **Push**.
 
 ### Gdzie można zainstalować
 
-`Only on this account`.
+`Any account` (aplikacja publiczna). Aplikacji prywatnej (`Only on this account`) nie mogą autoryzować osoby
+spoza organizacji, więc studenci dostaliby stronę 404 przy logowaniu. Publiczność aplikacji nie daje nikomu
+dostępu do wfais: Sprawdzarka używa wyłącznie instalacji w organizacji wfais.
+Istniejącą aplikację prywatną zmienisz w ustawieniach aplikacji: Advanced, Danger zone, **Make public**.
 
 Kliknij **Create GitHub App**.
 

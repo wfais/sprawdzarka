@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from kurs.github import git as git_modul
 from kurs.github import klient as klient_modul
-from kurs.models import Grupa, Przydzial, Zestaw
+from kurs.models import Grupa, Kurs, Przydzial, Rok, Uczelnia, Zestaw
 
 SEKRET = "sekret-testowy"
 
@@ -71,6 +71,11 @@ class FalszywyGitHub:
         self.chronione = []
         self.blad_zamkniecia = None
         self.drzewa = {}
+        self.nowy_start = "e" * 40      # wynik poprawki stanu startowego (None: brak zmian)
+        self.wyniki_scalenia = {}       # repozytorium -> WynikScalenia
+        self.scalenia = []
+        self.zawiera = {}
+        self.wyjatki_regul = []
 
     def _moze_blad(self, nazwa):
         if self.blad_przy == nazwa:
@@ -100,6 +105,24 @@ class FalszywyGitHub:
 
     def porownaj(self, pelna, sha_od, sha_do):
         return self.porownania.get((sha_od, sha_do), [])
+
+    def sha_galezi(self, pelna, ref="HEAD"):
+        return f"zrodlo-{pelna}"
+
+    def zezwol_aplikacji_na_galaz(self, pelna, galaz):
+        self.wyjatki_regul.append((pelna, galaz))
+
+    def czy_zawiera(self, pelna, sha, ref):
+        return self.zawiera.get(pelna, False)
+
+    def poprawka_startowa(self, zrodlo, start, komunikat, z_actions=False):
+        return self.nowy_start
+
+    def scal_poprawke(self, start, cel, sha_poprawki, galaz_poprawki, autoscalanie, komunikat):
+        from kurs.github.git import WynikScalenia
+        self.scalenia.append((cel, sha_poprawki, galaz_poprawki, autoscalanie))
+        domyslny = WynikScalenia(True, "m" * 40) if autoscalanie else WynikScalenia(False)
+        return self.wyniki_scalenia.get(cel, domyslny)
 
     def drzewo_blobow(self, pelna, sha):
         if sha not in self.drzewa:
@@ -151,8 +174,9 @@ class FalszywyGitHub:
         self.chronione.append((pelna, galaz))
 
     # git
-    def migawka_startowa(self, zrodlo, cel, komunikat):
+    def migawka_startowa(self, zrodlo, cel, komunikat, z_actions=False):
         self.migawki.append((zrodlo, cel))
+        self.z_actions = z_actions
         return "a" * 40
 
     def przygotuj_repo_studenta(self, start, cel, login):
@@ -164,8 +188,9 @@ FUNKCJE_KLIENTA = [
     "utworz_repo", "ustaw_galaz_domyslna", "zapros", "utworz_pr", "porownaj", "aktywnosc", "readme",
     "komentarz_pr", "zamknij_pr", "odbierz_dostep", "zmien_nazwe", "archiwizuj", "usun_repo",
     "pobierz_archiwum", "drzewo_plikow", "recenzja_pr", "chron_galaz", "drzewo_blobow",
+    "sha_galezi", "zezwol_aplikacji_na_galaz", "czy_zawiera",
 ]
-FUNKCJE_GIT = ["migawka_startowa", "przygotuj_repo_studenta"]
+FUNKCJE_GIT = ["migawka_startowa", "przygotuj_repo_studenta", "poprawka_startowa", "scal_poprawke"]
 
 
 @pytest.fixture
@@ -179,13 +204,24 @@ def github(monkeypatch):
 
 
 @pytest.fixture
-def grupa(db):
-    return Grupa.objects.create(nazwa="Grupa 4", skrot="g4")
+def rok(db):
+    uczelnia, _ = Uczelnia.objects.get_or_create(skrot="uj", defaults={"nazwa": "Uniwersytet Jagielloński"})
+    return Rok.objects.create(uczelnia=uczelnia, nazwa="2026/2027")
 
 
 @pytest.fixture
-def zestaw(db):
-    return Zestaw.objects.create(nazwa="Zestaw 3", skrot="z03", repo_zrodlowe="wfais/python-zestaw3",
+def kurs(rok):
+    return Kurs.objects.create(rok=rok, nazwa="Język Python", skrot="py")
+
+
+@pytest.fixture
+def grupa(kurs):
+    return Grupa.objects.create(kurs=kurs, nazwa="Grupa 4", skrot="g4")
+
+
+@pytest.fixture
+def zestaw(kurs):
+    return Zestaw.objects.create(kurs=kurs, nazwa="Zestaw 3", skrot="z03", repo_zrodlowe="wfais/python-zestaw3",
                                  punkty_max=Decimal("5"))
 
 
@@ -193,7 +229,7 @@ def zestaw(db):
 def przydzial(db, zestaw, grupa):
     teraz = timezone.now()
     return Przydzial.objects.create(
-        zestaw=zestaw, grupa=grupa, przedrostek_repo="py-z03-g4",
+        zestaw=zestaw, grupa=grupa, przedrostek_repo="py-z03-g4-",
         termin_miekki=teraz + timedelta(days=7), termin_twardy=teraz + timedelta(days=14),
         repo_startowe="wfais/py-z03-g4-start", sha_startowy="a" * 40,
     )

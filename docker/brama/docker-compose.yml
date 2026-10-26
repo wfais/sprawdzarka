@@ -1,0 +1,20 @@
+# Wspolna brama HTTPS dla wszystkich instancji Sprawdzarki na jednym serwerze.
+# Skopiuj ten katalog poza instancje (np. do /opt/brama), z Caddyfile.przyklad zrob Caddyfile
+# i uruchom: docker compose up -d
+#
+# Caddy dziala w sieci serwera (network_mode: host): odbiera ruch na portach 80 i 443, sam zdobywa
+# i odnawia certyfikaty HTTPS (Let's Encrypt) i przekazuje ruch do instancji na 127.0.0.1:PORT_WEB.
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - dane:/data
+      - konfiguracja:/config
+
+volumes:
+  dane:
+  konfiguracja:

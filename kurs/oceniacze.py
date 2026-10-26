@@ -1,6 +1,7 @@
-"""Dostep do modeli jezykowych oceniajacych prace: Anthropic, OpenAI, xAI, OpenRouter oraz model demonstracyjny.
+"""Dostep do modeli jezykowych oceniajacych prace: Anthropic, OpenAI, xAI, Google (Gemini), OpenRouter
+oraz model demonstracyjny.
 
-Model identyfikowany jest napisem dostawca:nazwa, np. anthropic:claude-sonnet-5-5
+Model identyfikowany jest napisem dostawca:nazwa, np. anthropic:claude-sonnet-5-5, google:gemini-3.5-flash
 albo openrouter:anthropic/claude-sonnet-5-5. Lista dostepnych modeli: OCENIAJACE_MODELE w pliku .env.
 """
 from __future__ import annotations
@@ -16,7 +17,7 @@ from typing import Optional
 import requests
 from django.conf import settings
 
-DOSTAWCY = ("anthropic", "openai", "xai", "openrouter", "demo")
+DOSTAWCY = ("anthropic", "openai", "xai", "google", "openrouter", "demo")
 LIMIT_CZASU = 300
 
 
@@ -47,6 +48,7 @@ class Model:
             "anthropic": settings.ANTHROPIC_API_KEY,
             "openai": settings.OPENAI_API_KEY,
             "xai": settings.XAI_API_KEY,
+            "google": settings.GEMINI_API_KEY,
             "openrouter": settings.OPENROUTER_API_KEY,
             "demo": "demo",
         }[self.dostawca]
@@ -125,6 +127,8 @@ def zapytaj(model: Model, system: str, tresc: str, max_tokeny: Optional[int] = N
         uzycie = dane.get("usage", {})
         return Odpowiedz(tekst, uzycie.get("input_tokens", 0), uzycie.get("output_tokens", 0),
                          time.monotonic() - start)
+    if model.dostawca == "google":
+        return _zapytaj_gemini(model, system, tresc, max_tokeny, start)
 
     url = {"openai": settings.OPENAI_API_URL, "xai": settings.XAI_API_URL,
            "openrouter": settings.OPENROUTER_API_URL}[model.dostawca]
@@ -152,6 +156,29 @@ def zapytaj(model: Model, system: str, tresc: str, max_tokeny: Optional[int] = N
         tekst = "".join(c.get("text", "") for c in tekst if isinstance(c, dict))
     uzycie = dane.get("usage", {}) or {}
     return Odpowiedz(tekst, uzycie.get("prompt_tokens", 0), uzycie.get("completion_tokens", 0),
+                     time.monotonic() - start)
+
+
+def _zapytaj_gemini(model: Model, system: str, tresc: str, max_tokeny: int, start: float) -> Odpowiedz:
+    """Google Gemini (generateContent). Limit odpowiedzi obejmuje tez tokeny rozumowania modelu."""
+    dane = _wyslij(
+        settings.GEMINI_API_URL.format(model=model.nazwa),
+        {"x-goog-api-key": model.klucz, "Content-Type": "application/json"},
+        {"systemInstruction": {"parts": [{"text": system}]},
+         "contents": [{"role": "user", "parts": [{"text": tresc}]}],
+         "generationConfig": {"temperature": 0, "maxOutputTokens": max_tokeny, "responseMimeType": "application/json"}},
+    )
+    kandydaci = dane.get("candidates") or []
+    if not kandydaci:
+        powod = (dane.get("promptFeedback") or {}).get("blockReason") or json.dumps(dane)[:300]
+        raise BladModelu(f"Pusta odpowiedź modelu: {powod}")
+    czesci = (kandydaci[0].get("content") or {}).get("parts") or []
+    tekst = "".join(c.get("text", "") for c in czesci if isinstance(c, dict) and not c.get("thought"))
+    if not tekst.strip() and kandydaci[0].get("finishReason") == "MAX_TOKENS":
+        raise BladModelu("Model wyczerpał limit odpowiedzi (zwiększ SPRAWDZARKA_LIMIT_ODPOWIEDZI w pliku .env).")
+    uzycie = dane.get("usageMetadata") or {}
+    return Odpowiedz(tekst, uzycie.get("promptTokenCount", 0),
+                     uzycie.get("candidatesTokenCount", 0) + uzycie.get("thoughtsTokenCount", 0),
                      time.monotonic() - start)
 
 

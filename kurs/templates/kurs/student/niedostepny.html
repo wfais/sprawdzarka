@@ -1,0 +1,17 @@
+{% extends "kurs/student/baza.html" %}
+{% block tytul %}{{ przydzial.zestaw.nazwa }}{% endblock %}
+{% block tresc %}
+<div class="okruszki">{{ przydzial.grupa.nazwa }}</div>
+<h1>{{ przydzial.zestaw.nazwa }}</h1>
+{% if poligon %}
+<p class="stan" style="margin:14px 0"><i class="dioda zolty" aria-hidden="true"></i>To zestaw z poligonu prowadzącego (dane fikcyjne).</p>
+<p class="drugie">Nie da się go zaakceptować. Jeśli dostałeś ten link na zajęciach, poproś prowadzącego o właściwy.</p>
+{% else %}
+<p class="stan" style="margin:14px 0"><i class="dioda czerwony" aria-hidden="true"></i>Zestaw jeszcze nie jest udostępniony.</p>
+<dl class="opis-pola" style="margin:12px 0 18px">
+  <dt>Dostępny od</dt><dd><strong>{{ przydzial.publikacja|date:"d.m.Y, H:i" }}</strong></dd>
+  <dt>Termin</dt><dd>{{ przydzial.termin_miekki|date:"d.m.Y, H:i" }}</dd>
+</dl>
+<p class="drugie">Wróć pod ten sam link po tym czasie. Wtedy zalogujesz się kontem GitHub i zaakceptujesz zestaw.</p>
+{% endif %}
+{% endblock %}

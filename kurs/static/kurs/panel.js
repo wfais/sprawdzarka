@@ -35,6 +35,16 @@ document.addEventListener("submit", function (zdarzenie) {
   }
 });
 
+document.addEventListener("change", function (zdarzenie) {
+  var nazwa = zdarzenie.target.getAttribute("data-zaznacz-wszystkie");
+  if (!nazwa) return;
+  // Nazwa pola albo (z kropka na poczatku) klasa pol
+  var wybor = nazwa.charAt(0) === "." ? "input[type=checkbox]" + nazwa : 'input[type=checkbox][name="' + nazwa + '"]';
+  document.querySelectorAll(wybor).forEach(function (pole) {
+    pole.checked = zdarzenie.target.checked;
+  });
+});
+
 document.addEventListener("click", function (zdarzenie) {
   var wiersz = zdarzenie.target.closest("tr[data-href]");
   if (!wiersz || zdarzenie.target.closest("a, button, form, input")) return;

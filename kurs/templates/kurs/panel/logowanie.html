@@ -1,13 +1,27 @@
 {% extends "kurs/panel/baza.html" %}
 {% block tytul %}Logowanie{% endblock %}
 {% block tresc %}
-<div class="karta" style="max-width:420px;margin:40px auto">
+<div class="karta karta-logowania">
   <h1>Logowanie prowadzącego</h1>
-  <p class="podtytul">Konto zakładasz poleceniem <code>python manage.py createsuperuser</code>.</p>
-  <form method="post" class="formularz">{% csrf_token %}
-    {{ form.as_div }}
+  {% if github %}
+  <p class="podtytul">Wejście tylko dla kont GitHub z listy dozwolonych.</p>
+  <a class="przycisk glowny szeroki" href="{% url 'panel:logowanie_github' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Zaloguj przez GitHub</a>
+  {% else %}
+  <p class="podtytul">Logowanie przez GitHub jest wyłączone. Włączysz je, wpisując swój login GitHub w
+    <code>PANEL_KONTA_GITHUB</code> w pliku <code>.env</code>.</p>
+  {% endif %}
+  {% if haslo %}
+  {% if github %}<details class="logowanie-haslem"{% if form.errors %} open{% endif %}><summary>Logowanie hasłem</summary>{% endif %}
+  <form method="post" class="formularz">{% csrf_token %}{{ form.as_div }}
     <input type="hidden" name="next" value="{{ next }}">
-    <button class="glowny" type="submit">Zaloguj</button>
+    <button {% if not github %}class="glowny" {% endif %}type="submit">Zaloguj</button>
   </form>
+  <p class="slabe">Konto z hasłem zakładasz poleceniem <code>python manage.py createsuperuser</code>.
+    Po {{ limit_prob }} nieudanych próbach logowanie hasłem jest wstrzymywane na {{ blokada_minut }} minut.</p>
+  {% if github %}</details>{% endif %}
+  {% elif not github %}
+  <p>Żaden sposób logowania nie jest włączony. Ustaw <code>PANEL_KONTA_GITHUB</code> albo
+    <code>PANEL_LOGOWANIE_HASLEM=1</code> w pliku <code>.env</code>.</p>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,13 @@
+# Jeden blok na instancje Sprawdzarki: jej domena (tak jak w PUBLICZNY_ADRES) i port (PORT_WEB z jej pliku .env).
+# Po zmianie: docker compose restart   (w katalogu bramy)
+
+srv2095410.hstgr.cloud {
+	encode gzip
+	reverse_proxy 127.0.0.1:8001
+}
+
+# Kolejna instancja, np. dla innego prowadzacego (wlasna domena albo subdomena wskazujaca na ten serwer):
+# sprawdzarka-kowalski.twoja-domena.pl {
+# 	encode gzip
+# 	reverse_proxy 127.0.0.1:8002
+# }

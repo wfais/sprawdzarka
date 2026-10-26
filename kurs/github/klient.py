@@ -297,13 +297,49 @@ def utworz_pr(pelna: str, head: str, base: str, tytul: str, tresc: str) -> int:
         raise
 
 
+def _wyjatek_aplikacji() -> list[dict]:
+    """Aplikacja moze przesuwac chroniona galaz (poprawki prowadzacego); nikt inny nie moze."""
+    if not settings.GITHUB_APP_ID:
+        return []
+    return [{"actor_id": int(settings.GITHUB_APP_ID), "actor_type": "Integration", "bypass_mode": "always"}]
+
+
 def chron_galaz(pelna: str, galaz: str) -> None:
     """Regula repozytorium: galezi nie mozna zmienic ani usunac (chroni stan startowy i pull request)."""
     zapytanie("POST", f"/repos/{pelna}/rulesets", oczekiwane=(201,), json={
         "name": f"ochrona-{galaz}", "target": "branch", "enforcement": "active",
+        "bypass_actors": _wyjatek_aplikacji(),
         "conditions": {"ref_name": {"include": [f"refs/heads/{galaz}"], "exclude": []}},
         "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}, {"type": "update"}],
     })
+
+
+def zezwol_aplikacji_na_galaz(pelna: str, galaz: str) -> None:
+    """Dopisuje aplikacje do wyjatkow reguly chroniacej galaz (repozytoria utworzone przed ta zmiana)."""
+    wyjatek = _wyjatek_aplikacji()
+    if not wyjatek:
+        return
+    for regula in zapytanie("GET", f"/repos/{pelna}/rulesets") or []:
+        if regula.get("name") != f"ochrona-{galaz}":
+            continue
+        dane = zapytanie("GET", f"/repos/{pelna}/rulesets/{regula['id']}")
+        obecne = dane.get("bypass_actors") or []
+        if any(a.get("actor_type") == "Integration" and a.get("actor_id") == wyjatek[0]["actor_id"] for a in obecne):
+            return
+        zapytanie("PUT", f"/repos/{pelna}/rulesets/{regula['id']}", json={
+            "name": dane["name"], "target": dane.get("target", "branch"), "enforcement": dane["enforcement"],
+            "bypass_actors": obecne + wyjatek, "conditions": dane.get("conditions", {}), "rules": dane.get("rules", []),
+        })
+
+
+def sha_galezi(pelna: str, ref: str = "HEAD") -> str:
+    return zapytanie("GET", f"/repos/{pelna}/commits/{ref}")["sha"]
+
+
+def czy_zawiera(pelna: str, sha: str, ref: str) -> bool:
+    """Czy galaz ref zawiera commit sha (np. czy student scalil poprawke)."""
+    dane = zapytanie("GET", f"/repos/{pelna}/compare/{sha}...{ref}")
+    return dane.get("status") in ("ahead", "identical")
 
 
 def komentarz_pr(pelna: str, numer: int, tresc: str) -> None:

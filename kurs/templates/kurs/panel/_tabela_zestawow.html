@@ -1,0 +1,14 @@
+<table class="tabela">
+  <tr><th>Skrót</th><th>Nazwa</th><th>Repozytorium źródłowe</th><th class="liczba">Punkty</th><th class="liczba">Grupy</th></tr>
+  {% for z in lista %}
+  <tr class="klik" data-href="{% url 'panel:zestaw' z.pk %}">
+    <td><code>{{ z.skrot }}</code></td>
+    <td><a href="{% url 'panel:zestaw' z.pk %}">{{ z.nazwa }}</a></td>
+    <td class="mono male">{{ z.repo_zrodlowe }}</td>
+    <td class="liczba">{{ z.punkty_max|floatformat:"-2" }}</td>
+    <td class="liczba">{{ z.liczba_grup }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="5" class="puste">{{ pusta }}</td></tr>
+  {% endfor %}
+</table>

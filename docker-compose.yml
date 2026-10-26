@@ -1,7 +1,9 @@
 # Sprawdzarka: baza, serwis WWW, robot (terminy i oceny), odizolowany tester, HTTPS
 #
 # Lokalnie (bez domeny):   docker compose up -d --build        -> http://localhost:8000
-# Na serwerze z domena:    docker compose --profile serwer up -d --build
+# Serwer, jedna instancja: docker compose --profile serwer up -d --build   (Caddy z HTTPS w tym projekcie)
+# Serwer, kilka instancji: kazda w osobnym katalogu z wlasnym PORT_WEB, wspolna brama HTTPS z docker/brama
+#                          (instrukcja: docs/serwer.md)
 #
 # Konfiguracja: plik .env (wzor: .env.przyklad), klucz aplikacji GitHub: dane/github-app.pem
 
@@ -39,7 +41,7 @@ services:
   web:
     <<: *wspolne
     ports:
-      - "${ADRES_WEB:-127.0.0.1}:8000:8000"
+      - "${ADRES_WEB:-127.0.0.1}:${PORT_WEB:-8000}:8000"
     depends_on:
       baza:
         condition: service_healthy

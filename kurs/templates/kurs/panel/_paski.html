@@ -1,6 +1,5 @@
-<div class="paski">
-  {% for kolor, etykieta, n in p.paski %}<a class="znacznik {{ kolor }}" href="{% url 'panel:przydzial' p.pk %}?kolor={{ kolor }}">{{ etykieta }} {{ n }}</a>{% endfor %}
-  {% if p.problemy %}<a class="znacznik czerwony" href="{% url 'panel:przydzial' p.pk %}?kolor=problemy">problemy {{ p.problemy }}</a>{% endif %}
-  {% if p.testy %}<a class="znacznik czerwony" href="{% url 'panel:przydzial' p.pk %}?kolor=testy" title="studenci, którzy zmienili pliki testów">zmienione testy {{ p.testy }}</a>{% endif %}
+<div class="liczniki">
+  {% for s, n in p.paski %}<a class="licznik{% if filtr == s.klucz %} aktywny{% endif %}" href="{% url 'panel:przydzial' p.pk %}?stan={{ s.klucz }}" title="{{ s.opis }}"><i class="dioda {{ s.dioda }}" aria-hidden="true"></i><b>{{ n }}</b> {{ s.etykieta }}</a>{% endfor %}
+  {% if p.testy %}<a class="licznik alarm{% if filtr == 'testy' %} aktywny{% endif %}" href="{% url 'panel:przydzial' p.pk %}?stan=testy" title="studenci, którzy zmienili pliki testów"><b>{{ p.testy }}</b> zmienione testy</a>{% endif %}
   {% if not p.lacznie %}<span class="slabe male">nikt jeszcze nie zaakceptował</span>{% endif %}
 </div>

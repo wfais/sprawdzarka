@@ -12,6 +12,18 @@
 
 {% if zgloszenie and zgloszenie.status == Status.GOTOWE %}
   <h2>Twoje repozytorium jest gotowe</h2>
+  {% for p in poprawki %}
+  <div class="uwaga">
+    {% if p.stan == "do_scalenia" %}
+      Prowadzący wprowadził poprawkę nr {{ p.poprawka.numer }}{% if p.poprawka.opis %} ({{ p.poprawka.opis }}){% endif %}.
+      Scal ją ze swoją pracą: <a href="{{ p.url_pr }}" target="_blank" rel="noopener">pull request „Poprawka prowadzącego nr {{ p.poprawka.numer }}”</a>
+      (instrukcja jest w jego opisie).
+    {% else %}
+      Prowadzący wprowadził poprawkę nr {{ p.poprawka.numer }}{% if p.poprawka.opis %} ({{ p.poprawka.opis }}){% endif %}
+      i scalił ją z Twoją pracą. Przed dalszą pracą zrób <code>git pull</code>.
+    {% endif %}
+  </div>
+  {% endfor %}
   <ol class="kroki">
     <li><a class="przycisk glowny" href="{{ zgloszenie.url_zaproszenia }}" target="_blank" rel="noopener">Przyjmij zaproszenie na GitHubie</a><br>
       <span class="pomoc">Bez tego nie zobaczysz repozytorium. Zaproszenie przyszło też e-mailem.</span></li>

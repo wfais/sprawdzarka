@@ -1,0 +1,78 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}{{ rok.nazwa }} ({{ rok.uczelnia.skrot|upper }}){% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with rok=rok tylko_uczelnia=True bez_znacznikow=True only %}
+<div class="naglowek">
+  <div><h1><span class="plakietka" title="{{ rok.uczelnia.nazwa }}">{{ rok.uczelnia.skrot|upper }}</span>Rok akademicki {{ rok.nazwa }}</h1>
+    <p class="meta"><span>{{ rok.uczelnia.nazwa }}</span><span>skrót <code>{{ rok.skrot }}</code></span>
+      {% if rok.zarchiwizowany %}<span class="znacznik szary">zarchiwizowany {{ rok.zarchiwizowano|date:"d.m.Y" }}</span>
+      {% elif rok.ukryty %}<span class="znacznik szary">ukryty na pulpicie</span>{% endif %}</p>
+  </div>
+  <div class="przyciski">
+    <a class="przycisk" href="{% url 'panel:rok_edycja' rok.pk %}">Edytuj</a>
+    <form method="post" action="{% url 'panel:rok_ukryj' rok.pk %}" class="w-linii">{% csrf_token %}
+      <button type="submit">{% if rok.ukryty %}Pokaż na pulpicie{% else %}Ukryj cały rok{% endif %}</button></form>
+    {% if rok.poligon %}
+    <a class="przycisk" href="{% url 'panel:rok_usun' rok.pk %}">Usuń z bazy</a>
+    {% else %}
+    <a class="przycisk" href="{% url 'panel:rok_eksport' rok.pk %}" title="Plik JSON z kompletem danych roku (wszystkie przedmioty), do zachowania i ponownego wczytania">Pobierz archiwum</a>
+    {% if rok.zarchiwizowany %}
+    <form method="post" action="{% url 'panel:rok_przywroc' rok.pk %}" class="w-linii">{% csrf_token %}
+      <button type="submit">Przywróć</button></form>
+    <a class="przycisk" href="{% url 'panel:rok_usun' rok.pk %}">Usuń z bazy</a>
+    {% else %}
+    <form method="post" action="{% url 'panel:rok_archiwizuj' rok.pk %}" class="w-linii"
+          data-potwierdz="Zarchiwizować rok {{ rok.nazwa }} ze wszystkimi przedmiotami? Wszystkie zestawy zostaną zamknięte dla nowych zgłoszeń, robot przestanie synchronizować repozytoria, a rok zniknie z pulpitu. Dane zostają w bazie, a plik archiwum pobierzesz w każdej chwili.">{% csrf_token %}
+      <button type="submit">Archiwizuj</button></form>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% if rok.poligon %}
+<div class="uwaga poligon-uwaga">Poligon: dane fikcyjne do prób, bez połączenia z GitHubem. Cały poligon usuniesz w
+  <a href="{% url 'panel:administracja' %}">Administracji</a>.</div>
+{% endif %}
+{% if rok.zarchiwizowany %}
+<div class="uwaga">Rok zarchiwizowany: tylko do odczytu. Robot nie synchronizuje jego repozytoriów i nie ocenia zgłoszeń.
+  Pobierz plik archiwum i zachowaj go. Po pobraniu możesz usunąć rok z bazy, a później wczytać go z pliku w strukturze.</div>
+{% endif %}
+
+<div class="siatka-2">
+  <section class="karta">
+    <h2>Przedmioty</h2>
+    <table class="tabela">
+      {% for k in kursy %}
+      <tr class="klik{% if k.ukryty %} wyciszony{% endif %}" data-href="{% url 'panel:kurs' k.pk %}">
+        <td><a href="{% url 'panel:kurs' k.pk %}"><strong>{{ k.nazwa }}</strong></a>
+          {% if k.kod %}<div class="male"><span class="kod-przedmiotu">{{ k.kod }}</span></div>{% endif %}</td>
+        <td class="drugie male"><span class="meta" style="margin:0"><span>grupy <b>{{ k.liczba_grup }}</b></span><span>zestawy <b>{{ k.liczba_zestawow }}</b></span><span>kolokwia <b>{{ k.liczba_kolokwiow }}</b></span></span></td>
+        <td style="text-align:right">{% if k.ukryty %}<span class="stan"><i class="dioda wylaczona" aria-hidden="true"></i>ukryty</span>{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td class="slabe">Brak przedmiotów w tym roku.</td></tr>
+      {% endfor %}
+    </table>
+    {% if zgloszen %}<p class="drugie male">Zgłoszenia studentów w tym roku: {{ zgloszen }}.</p>{% endif %}
+  </section>
+  {% if not rok.zarchiwizowany %}
+  <div>
+    <details class="karta rozwijana"{% if formularz.errors or not kursy %} open{% endif %}>
+      <summary><h2>Nowy przedmiot</h2></summary>
+      <form method="post" class="formularz">{% csrf_token %}
+        {{ formularz.as_div }}
+        <button class="glowny" type="submit">Dodaj przedmiot</button>
+      </form>
+    </details>
+    {% if do_skopiowania %}
+    <details class="karta rozwijana">
+      <summary><h2>Kopiuj z innego roku</h2></summary>
+      <p class="drugie male">Przedmiot ze wszystkimi zestawami i kolokwiami, bez wydań grupom, terminów i zgłoszeń.</p>
+      <ul class="lista-kont">{% for k in do_skopiowania %}
+        <li><span>{{ k.nazwa }} <span class="slabe">{{ k.rok.nazwa }}</span></span>
+          <a class="przycisk maly" href="{% url 'panel:kurs_kopiuj' k.pk %}?rok={{ rok.pk }}">Kopiuj tutaj</a></li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

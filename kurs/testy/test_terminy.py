@@ -113,3 +113,44 @@ def test_wzorce_plikow():
     assert terminy.pasuje_do_wzorcow("src/a.ipynb", ["*.py", "*.ipynb"])
     assert terminy.pasuje_do_wzorcow("src/a.txt", ["src/*"])
     assert not terminy.pasuje_do_wzorcow("inne/a.txt", ["src/*"])
+
+
+# --- Wypchniecia z innych kont (prowadzacy) ---
+
+def test_wypchniecie_prowadzacego_po_terminie_nie_zmienia_koloru():
+    pushe = [
+        Push(T0 + timedelta(days=1), "1" * 40, START),
+        Push(TWARDY + timedelta(days=1), "2" * 40, "1" * 40, wlasny=False),
+    ]
+    wynik = oblicz(pushe, TWARDY + timedelta(days=2), zmiany_kodu({"1" * 40: "v1", "2" * 40: "v2"}))
+    assert wynik.kolor == terminy.ZIELONY
+    # Oceniany jest stan z terminu ostatecznego; zmiana prowadzacego po nim tylko zmienia stan biezacy
+    assert wynik.sha_oceniany == "1" * 40 and wynik.sha_teraz == "2" * 40
+
+
+def test_zmiana_prowadzacego_nie_obciaza_studenta():
+    # Prowadzacy zmienil kod po terminie, student pobral to i dopisal tylko README
+    pushe = [
+        Push(T0 + timedelta(days=1), "1" * 40, START),
+        Push(MIEKKI + timedelta(hours=1), "2" * 40, "1" * 40, wlasny=False),
+        Push(MIEKKI + timedelta(hours=2), "3" * 40, "2" * 40),
+    ]
+    wynik = oblicz(pushe, TWARDY + timedelta(days=1), zmiany_kodu({"1" * 40: "v1", "2" * 40: "v2", "3" * 40: "v2"}))
+    assert wynik.kolor == terminy.ZIELONY
+    assert wynik.sha_oceniany == "3" * 40
+
+
+def test_wlasna_zmiana_po_terminie_nadal_liczona_mimo_obcych():
+    pushe = [
+        Push(T0 + timedelta(days=1), "1" * 40, START),
+        Push(MIEKKI + timedelta(hours=1), "2" * 40, "1" * 40, wlasny=False),
+        Push(MIEKKI + timedelta(hours=2), "3" * 40, "2" * 40),
+    ]
+    wynik = oblicz(pushe, TWARDY + timedelta(days=1), zmiany_kodu({"1" * 40: "v1", "2" * 40: "v2", "3" * 40: "v3"}))
+    assert wynik.kolor == terminy.ZOLTY
+
+
+def test_tylko_prowadzacy_zmienil_kod_to_brak_oddania():
+    pushe = [Push(T0 + timedelta(days=1), "1" * 40, START, wlasny=False)]
+    wynik = oblicz(pushe, TWARDY + timedelta(days=1), zmiany_kodu({"1" * 40: "v1"}))
+    assert wynik.kolor == terminy.SZARY

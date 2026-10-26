@@ -108,16 +108,10 @@ def test_precedensy_trafiaja_do_polecenia(zgloszenie, modele):
 
 
 @pytest.mark.django_db
-def test_automatyczne_zamkniecie_zgodnej_oceny(zgloszenie, modele, github):
+def test_ocena_nigdy_nie_trafia_do_studenta_sama(zgloszenie, modele, github):
     github.archiwa["d" * 40] = {k: v for k, v in STUDENT.items() if k not in ("ZADANIE2/gra.py", "conftest.py")} | {
         "ZADANIE2/gra.py": "import random\nprint(random.randint(1, 6))\n",
         "ZADANIE1/tests/test_main.py": BAZA["ZADANIE1/tests/test_main.py"]}
-    zestaw = zgloszenie.przydzial.zestaw
-    zestaw.auto_zamykanie = True
-    zestaw.save()
-    # Przed terminem ostatecznym ocena nie jest zamykana automatycznie
-    ewaluacja = ocen(zgloszenie)
-    assert not ewaluacja.sporna and not ewaluacja.zatwierdzona
     from datetime import timedelta
 
     from django.utils import timezone
@@ -126,14 +120,40 @@ def test_automatyczne_zamkniecie_zgodnej_oceny(zgloszenie, modele, github):
     przydzial.termin_miekki = timezone.now() - timedelta(days=2)
     przydzial.termin_twardy = timezone.now() - timedelta(days=1)
     przydzial.save()
-    ewaluacja = ocena.zakolejkuj(zgloszenie, wymus=True)
-    ocena.przetworz_kolejke()
-    ewaluacja.refresh_from_db()
-    assert ewaluacja.zatwierdzona and ewaluacja.automatycznie
+    ewaluacja = ocen(zgloszenie)
+    assert not ewaluacja.sporna and not ewaluacja.zatwierdzona
     zgloszenie.refresh_from_db()
+    assert not zgloszenie.pr_zamkniety and not github.komentarze
+
+
+@pytest.mark.django_db
+def test_zbiorcza_wysylka_ocen(client, prowadzacy, zgloszenie, modele, github):
+    github.archiwa["d" * 40] = {k: v for k, v in STUDENT.items() if k not in ("ZADANIE2/gra.py", "conftest.py")} | {
+        "ZADANIE2/gra.py": "import random\nprint(random.randint(1, 6))\n",
+        "ZADANIE1/tests/test_main.py": BAZA["ZADANIE1/tests/test_main.py"]}
+    ewaluacja = ocen(zgloszenie)
+    lista = client.get(f"/panel/przydzialy/{zgloszenie.przydzial_id}/").content.decode()
+    assert "Wyślij oceny zaznaczonym" in lista and f'name="zgl" value="{zgloszenie.pk}"' in lista
+    odp = client.post(f"/panel/przydzialy/{zgloszenie.przydzial_id}/wyslij-oceny/", {"zgl": [zgloszenie.pk]})
+    assert odp.status_code == 302
+    ewaluacja.refresh_from_db()
+    zgloszenie.refresh_from_db()
+    assert ewaluacja.zatwierdzona and not ewaluacja.automatycznie
     assert zgloszenie.pr_zamkniety and zgloszenie.punkty == D("1.00")
     tresc = github.komentarze[-1][2]
     assert "ZADANIE1: 0,5 / 1" in tresc and "RAZEM: 1 / 5" in tresc
+    # Ponowna wysylka nic nie dubluje
+    client.post(f"/panel/przydzialy/{zgloszenie.przydzial_id}/wyslij-oceny/", {"zgl": [zgloszenie.pk]})
+    assert len(github.komentarze) == 1
+
+
+@pytest.mark.django_db
+def test_zbiorcza_wysylka_pomija_niepelne_oceny(client, prowadzacy, zgloszenie, github):
+    ocen(zgloszenie)  # bez modeli: ZADANIE2 (tylko modele) bez punktow
+    odp = client.post(f"/panel/przydzialy/{zgloszenie.przydzial_id}/wyslij-oceny/", {"zgl": [zgloszenie.pk]}, follow=True)
+    assert "brak punktów w zadaniach ZADANIE2" in odp.content.decode()
+    zgloszenie.refresh_from_db()
+    assert not zgloszenie.pr_zamkniety and not github.komentarze
 
 
 @pytest.mark.django_db
@@ -316,6 +336,27 @@ def test_format_zapytan_anthropic_i_openai(settings):
 
 
 @responses.activate
+def test_format_zapytania_gemini(settings):
+    settings.GEMINI_API_KEY = "kg"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-x:generateContent"
+    responses.post(url, json={
+        "candidates": [{"content": {"parts": [{"text": "rozwazania", "thought": True}, {"text": '{"ok": true}'}]},
+                        "finishReason": "STOP"}],
+        "usageMetadata": {"promptTokenCount": 11, "candidatesTokenCount": 4, "thoughtsTokenCount": 6}})
+    g = oceniacze.zapytaj(oceniacze.Model.z_napisu("google:gemini-x"), "sys", "tresc")
+    assert g.tekst == '{"ok": true}' and g.tokeny_we == 11 and g.tokeny_wy == 10
+    wyslane = json.loads(responses.calls[0].request.body)
+    assert responses.calls[0].request.headers["x-goog-api-key"] == "kg"
+    assert wyslane["systemInstruction"]["parts"][0]["text"] == "sys"
+    assert wyslane["generationConfig"]["responseMimeType"] == "application/json"
+    assert wyslane["generationConfig"]["temperature"] == 0
+    # Zablokowane polecenie: czytelny blad
+    responses.post(url, json={"promptFeedback": {"blockReason": "SAFETY"}})
+    with pytest.raises(oceniacze.BladModelu, match="SAFETY"):
+        oceniacze.zapytaj(oceniacze.Model.z_napisu("google:gemini-x"), "sys", "tresc")
+
+
+@responses.activate
 def test_ponowienie_przy_przeciazeniu(settings, monkeypatch):
     settings.ANTHROPIC_API_KEY = "ka"
     monkeypatch.setattr(oceniacze.time, "sleep", lambda s: None)
@@ -344,3 +385,145 @@ def test_opis_zmian_testow():
     assert ocena.opis_zmian_testow({"zmienione": [], "usuniete": [], "dodane": ["tests/test_moj.py"]}) == []
     uwagi = ocena.opis_zmian_testow({"zmienione": [], "usuniete": ["tests/test_a.py"], "dodane": ["pytest.ini"]})
     assert len(uwagi) == 2 and "usunął" in uwagi[0] and "pytest.ini" in uwagi[1]
+
+
+# --- Zadania z katalogow repozytorium ---
+
+UKLAD = ['.gitignore', 'README.md', 'ZADANIE1/__init__.py', 'ZADANIE1/tests/__init__.py',
+         'ZADANIE1/tests/test_zadanie1.py', 'ZADANIE1/zadanie1.py', 'ZADANIE2/__init__.py',
+         'ZADANIE2/tests/__init__.py', 'ZADANIE2/tests/test_zadanie2.py', 'ZADANIE2/zadanie2.py']
+
+
+def test_zadania_z_katalogow_podzial_punktow():
+    zadania = ocena.zadania_z_katalogow(UKLAD, "", D(5), D("0.25"))
+    assert [(z["kod"], z["katalog"], z["punkty"], z["tryb"]) for z in zadania] == [
+        ("ZADANIE1", "ZADANIE1/", D("2.5"), Zadanie.Tryb.TESTY_I_MODELE),
+        ("ZADANIE2", "ZADANIE2/", D("2.5"), Zadanie.Tryb.TESTY_I_MODELE),
+    ]
+
+
+def test_zadania_z_katalogow_punkty_i_kryteria_z_tresci():
+    pliki = UKLAD + ["ZADANIE3/gra.py", "ZADANIE10/x.py", ".github/workflows/a.yml", "tests/test_ogolny.py"]
+    tresc = ("Zestaw 3\nZadanie 1 (1 pkt): funkcja suma.\nZadanie 2 - 1,5 pkt\nDruga funkcja.\n"
+             "Zadanie 3 [2 pkt] gra w kosci w tkinter.\nZadanie 10 (0,5 punktu) dodatkowe.")
+    zadania = ocena.zadania_z_katalogow(pliki, tresc, D(5), D("0.25"))
+    assert [z["kod"] for z in zadania] == ["ZADANIE1", "ZADANIE2", "ZADANIE3", "ZADANIE10"]
+    assert [z["punkty"] for z in zadania] == [D("1"), D("1.5"), D("2"), D("0.5")]
+    assert zadania[2]["tryb"] == Zadanie.Tryb.MODELE  # brak testow (np. GUI)
+    assert zadania[2]["kryteria"].startswith("Zadanie 3") and "tkinter" in zadania[2]["kryteria"]
+
+
+def test_rowny_podzial_w_krokach():
+    assert ocena._rozdziel_punkty(D(5), 3, D("0.25")) == [D("1.75"), D("1.75"), D("1.5")]
+    assert sum(ocena._rozdziel_punkty(D(10), 7, D("0.25"))) == D(10)
+
+
+def test_inne_nazwy_katalogow_gdy_brak_zadan():
+    zadania = ocena.zadania_z_katalogow(["kalkulator/main.py", "kalkulator/test_main.py", "docs/opis.md"],
+                                        "", D(4), D("0.25"))
+    assert [(z["kod"], z["punkty"]) for z in zadania] == [("kalkulator", D(4))]
+
+
+@pytest.mark.django_db
+def test_przycisk_utworz_z_katalogow(client, prowadzacy, github, zestaw):
+    odp = client.post(f"/panel/zestawy/{zestaw.pk}/z-katalogow/")
+    assert odp.status_code == 302
+    kody = list(zestaw.zadania.values_list("kod", "katalog", "tryb"))
+    # FalszywyGitHub: ZADANIE1 z testami, ZADANIE2 bez testow
+    assert kody == [("ZADANIE1", "ZADANIE1/", "testy_modele"), ("ZADANIE2", "ZADANIE2/", "modele")]
+
+
+@pytest.mark.django_db
+def test_nowy_zestaw_dostaje_zadania_z_katalogow(client, prowadzacy, github, kurs):
+    from kurs.models import Zestaw
+    odp = client.post(f"/panel/kursy/{kurs.pk}/nowy-zestaw/", {
+        "rodzaj": "zestaw", "nazwa": "Zestaw 7", "skrot": "z07", "repo_zrodlowe": "wfais/python-zestaw7", "wzorce_kodu": "*.py",
+        "punkty_max": "4", "modele": "",
+    })
+    assert odp.status_code == 302
+    zestaw = Zestaw.objects.get(skrot="z07")
+    assert list(zestaw.zadania.values_list("kod", "punkty")) == [("ZADANIE1", D(2)), ("ZADANIE2", D(2))]
+
+
+@pytest.mark.django_db
+def test_pusty_wiersz_nowego_zadania_pomijany(client, prowadzacy, github, zestaw):
+    client.post(f"/panel/zestawy/{zestaw.pk}/z-katalogow/")
+    strona = client.get(f"/panel/zestawy/{zestaw.pk}/zadania/")
+    formularze = strona.context["formularze"]
+    dane = {}
+    for f in formularze:
+        for nazwa, pole in f.fields.items():
+            wartosc = f[nazwa].value()
+            if wartosc is not None and wartosc is not False:
+                dane[f.add_prefix(nazwa)] = wartosc
+    zarzadzanie = formularze.management_form
+    dane.update({zarzadzanie.add_prefix(k): v for k, v in zarzadzanie.initial.items()})
+    assert formularze.forms[-1]["kolejnosc"].value() == 3
+    odp = client.post(f"/panel/zestawy/{zestaw.pk}/zadania/", dane)
+    assert odp.status_code == 302
+    assert zestaw.zadania.count() == 2
+
+
+@pytest.mark.django_db
+def test_tryb_tylko_testy_bez_modeli_w_zadaniu(zgloszenie, settings, github):
+    settings.SPRAWDZARKA_MODELE = ["demo:a", "demo:b", "demo:c"]
+    # Czyste rozwiazanie: bez zmian w testach i bez podejrzanych tresci
+    github.archiwa["d" * 40] = {k: v for k, v in STUDENT.items() if k not in ("conftest.py", "ZADANIE2/gra.py")} | {
+        "ZADANIE1/tests/test_main.py": BAZA["ZADANIE1/tests/test_main.py"],
+        "ZADANIE2/gra.py": "import random\nprint(random.randint(1, 6))\n"}
+    Zadanie.objects.filter(kod="ZADANIE1").update(tryb=Zadanie.Tryb.TESTY)
+    ewaluacja = ocen(zgloszenie)
+    z1 = ewaluacja.oceny_zadan.get(kod="ZADANIE1")
+    assert z1.punkty_konsensus == D("0.50") and not z1.sporne
+    assert "zdane 1 z 2" in z1.komentarz and "test_ujemne" in z1.komentarz
+    # Zadanie "tylko testy" nie trafia do modeli
+    assert ewaluacja.opinie.exists()
+    for opinia in ewaluacja.opinie.all():
+        assert [z.get("kod") for z in opinia.dane.get("zadania", [])] == ["ZADANIE2"]
+    assert ewaluacja.oceny_zadan.get(kod="ZADANIE2").punkty_konsensus is not None
+
+
+@pytest.mark.django_db
+def test_same_zadania_tylko_testy_daja_zgodna_ocene(zgloszenie, github):
+    github.archiwa["d" * 40] = {k: v for k, v in STUDENT.items() if k not in ("conftest.py", "ZADANIE2/gra.py")} | {
+        "ZADANIE1/tests/test_main.py": BAZA["ZADANIE1/tests/test_main.py"]}
+    Zadanie.objects.filter(kod="ZADANIE1").update(tryb=Zadanie.Tryb.TESTY)
+    Zadanie.objects.filter(kod="ZADANIE2").delete()
+    ewaluacja = ocen(zgloszenie)
+    assert not ewaluacja.sporna, ewaluacja.podejrzane
+    assert ewaluacja.suma == D("0.50")
+
+
+@pytest.mark.django_db
+def test_zmiana_trybu_zadania_wymaga_nowej_oceny(client, prowadzacy, zgloszenie, github):
+    pierwsza = ocen(zgloszenie)
+    # Bez zmian w ustawieniach: ponowne zlecenie uzywa istniejacej oceny
+    assert ocena.zakolejkuj(zgloszenie) == pierwsza
+    Zadanie.objects.filter(kod="ZADANIE1").update(tryb=Zadanie.Tryb.TESTY)
+    lista = client.get(f"/panel/przydzialy/{zgloszenie.przydzial_id}/").content.decode()
+    assert "nieaktualna" in lista and f'name="zgl" value="{zgloszenie.pk}"' not in lista
+    assert "wcześniejszych ustawień" in ocena.wyslij_ocene(pierwsza)
+    druga = ocena.zakolejkuj(zgloszenie)
+    assert druga != pierwsza and druga.status == Ewaluacja.Status.OCZEKUJE
+
+
+def test_zasady_ogolne_nie_traktuja_testow_jak_wyroczni(settings):
+    assert "test wydaje się błędny" in settings.SPRAWDZARKA_ZASADY_OGOLNE
+
+
+@pytest.mark.django_db
+def test_karta_gdy_testy_wylaczone(client, prowadzacy, zgloszenie, settings):
+    settings.SPRAWDZARKA_TESTY = "wylaczone"
+    ocen(zgloszenie)
+    karta = client.get(f"/panel/zgloszenia/{zgloszenie.pk}/")
+    assert karta.status_code == 200
+    assert "Testy nie zostały uruchomione: uruchamianie testów jest wyłączone" in karta.content.decode()
+
+
+def test_komentarz_gdy_kodu_nie_da_sie_wczytac():
+    zadanie = {"testy_zdane": 0, "testy_wszystkie": 1, "niezdane": [
+        {"nazwa": "ZADANIE1.tests.test_zadanie1", "plik": "ZADANIE1/tests/test_zadanie1.py", "wczytanie": True,
+         "powod": "SyntaxError: invalid syntax (ZADANIE1/zadanie1.py, linia 5)"}]}
+    assert ocena._komentarz_testow(zadanie) == (
+        "Testy nie mogly sie uruchomic, bo kodu nie da sie wczytac: "
+        "SyntaxError: invalid syntax (ZADANIE1/zadanie1.py, linia 5).")

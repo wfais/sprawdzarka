@@ -411,3 +411,119 @@ def test_niepewne_porownanie_nie_zdejmuje_flagi(github, przydzial, monkeypatch):
     z.refresh_from_db()
     assert z.testy_zmienione
     assert z.zmiany_testow == {"zmienione": ["tests/test_a.py"], "niepewne": True}
+
+
+@pytest.mark.django_db
+def test_wypchniecia_prowadzacego_pomijane(github, przydzial):
+    z = _zgloszenie_gotowe(przydzial, github)
+    teraz = timezone.now()
+    przydzial.termin_miekki = teraz - timedelta(days=2)
+    przydzial.termin_twardy = teraz - timedelta(days=1)
+    przydzial.save()
+    student = z.student
+    # utworzenie galezi przez aplikacje, wypchniecie studenta w terminie, poprawka prowadzacego po terminie
+    Wypchniecie.objects.create(repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed="0" * 40,
+                               sha_po="c" * 40, czas=teraz - timedelta(days=5), autor="sprawdzarka-wfais[bot]",
+                               autor_id=999, zrodlo="aktywnosc")
+    Wypchniecie.objects.create(repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed="c" * 40,
+                               sha_po="d" * 40, czas=teraz - timedelta(days=3), autor=student.login,
+                               autor_id=student.github_id, zrodlo="aktywnosc")
+    Wypchniecie.objects.create(repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed="d" * 40,
+                               sha_po="e" * 40, czas=teraz - timedelta(hours=2), autor="witoldprzygoda",
+                               autor_id=38453366, zrodlo="aktywnosc")
+    github.porownania = {
+        ("b" * 40, "d" * 40): ["ZADANIE1/main.py"],
+        ("c" * 40, "d" * 40): ["ZADANIE1/main.py"],
+        ("b" * 40, "e" * 40): ["ZADANIE1/main.py"],
+        ("d" * 40, "e" * 40): ["ZADANIE1/main.py"],
+    }
+    uslugi.przelicz(z)
+    z.refresh_from_db()
+    assert z.stan_kolor == Zgloszenie.Kolor.ZIELONY
+    assert z.sha_oceniany == "d" * 40 and z.sha_teraz == "e" * 40
+    assert "Pominięto wypchnięcia z innych kont" in z.stan_opis and ": 1." in z.stan_opis
+    assert z.ostatnie_wypchniecie < teraz - timedelta(days=2)
+
+
+@pytest.mark.django_db
+def test_stare_wpisy_bez_numeru_konta_rozpoznawane_po_loginie(github, przydzial):
+    z = _zgloszenie_gotowe(przydzial, github)
+    w_student = Wypchniecie(autor="JanK", autor_id=None)
+    w_obcy = Wypchniecie(autor="witoldprzygoda", autor_id=None)
+    w_nieznany = Wypchniecie(autor="", autor_id=None)
+    assert uslugi.od_studenta(w_student, z.student)
+    assert not uslugi.od_studenta(w_obcy, z.student)
+    assert uslugi.od_studenta(w_nieznany, z.student)
+    # numer konta ma pierwszenstwo przed loginem (student mogl zmienic login)
+    assert uslugi.od_studenta(Wypchniecie(autor="stary-login", autor_id=z.student.github_id), z.student)
+
+
+@pytest.mark.django_db
+def test_synchronizacja_zapisuje_numer_konta(github, przydzial):
+    z = _zgloszenie_gotowe(przydzial, github)
+    github.aktywnosci[z.repo_nazwa] = [
+        {"activity_type": "push", "ref": "refs/heads/main", "before": "c" * 40, "after": "d" * 40,
+         "timestamp": "2026-10-21T10:00:00Z", "actor": {"login": "jank", "id": 77}},
+    ]
+    uslugi.synchronizuj(z)
+    assert Wypchniecie.objects.get(repo_id=z.repo_id).autor_id == 77
+
+
+@pytest.mark.django_db
+def test_poprawka_testu_przez_prowadzacego_nie_daje_znacznika(github, przydzial):
+    z = _zgloszenie_gotowe(przydzial, github)
+    teraz = timezone.now()
+    # prowadzacy poprawia test w repozytorium studenta, student pobiera to i dopisuje kod
+    _wypchnij(z, "c", "d", 3)
+    Wypchniecie.objects.filter(sha_po="d" * 40).update(autor="witoldprzygoda", autor_id=38453366)
+    Wypchniecie.objects.create(repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed="d" * 40,
+                               sha_po="e" * 40, czas=teraz - timedelta(hours=1), autor="jank", autor_id=77,
+                               zrodlo="aktywnosc")
+    baza = {"ZADANIE1/main.py": "1", "ZADANIE1/tests/test_main.py": "2"}
+    github.drzewa = {
+        "b" * 40: baza, "c" * 40: baza,
+        "d" * 40: {**baza, "ZADANIE1/tests/test_main.py": "P"},
+        "e" * 40: {**baza, "ZADANIE1/main.py": "9", "ZADANIE1/tests/test_main.py": "P"},
+    }
+    github.porownania = {
+        ("c" * 40, "d" * 40): ["ZADANIE1/tests/test_main.py"],
+        ("b" * 40, "e" * 40): ["ZADANIE1/main.py", "ZADANIE1/tests/test_main.py"],
+    }
+    uslugi.przelicz(z)
+    z.refresh_from_db()
+    assert not z.testy_zmienione, z.zmiany_testow
+
+    # a zmiana testu przez samego studenta nadal jest znakowana
+    Wypchniecie.objects.create(repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed="e" * 40,
+                               sha_po="f" * 40, czas=teraz - timedelta(minutes=5), autor="jank", autor_id=77,
+                               zrodlo="aktywnosc")
+    github.drzewa["f" * 40] = {**baza, "ZADANIE1/main.py": "9", "ZADANIE1/tests/test_main.py": "S"}
+    github.porownania[("b" * 40, "f" * 40)] = ["ZADANIE1/main.py", "ZADANIE1/tests/test_main.py"]
+    uslugi.przelicz(z)
+    z.refresh_from_db()
+    assert z.testy_zmienione and z.zmiany_testow.get("zmienione") == ["ZADANIE1/tests/test_main.py"]
+
+
+@pytest.mark.django_db
+def test_ustawienie_actions_przekazywane_do_migawki(github, przydzial):
+    przydzial.repo_startowe, przydzial.sha_startowy = "", ""
+    przydzial.save()
+    uslugi.utworz_repo_startowe(przydzial)
+    assert github.z_actions is False
+    zestaw = przydzial.zestaw
+    zestaw.kopiuj_actions = True
+    zestaw.save()
+    przydzial.repo_startowe, przydzial.sha_startowy = "", ""
+    przydzial.save()
+    uslugi.utworz_repo_startowe(przydzial)
+    assert github.z_actions is True
+
+
+@pytest.mark.django_db
+def test_przedrostek_uzyty_dokladnie_jak_wpisany(github, przydzial):
+    przydzial.przedrostek_repo = "set0-"
+    przydzial.save()
+    assert uslugi.nazwa_repo_studenta(przydzial, "PythonUniversity") == "set0-pythonuniversity"
+    przydzial.przedrostek_repo = "set0_"
+    przydzial.save()
+    assert uslugi.nazwa_repo_studenta(przydzial, "PythonUniversity") == "set0_pythonuniversity"

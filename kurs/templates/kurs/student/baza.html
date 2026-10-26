@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {% block naglowek_strony %}{% endblock %}
 <title>{% block tytul %}Zestaw zadań{% endblock %}</title>
-<link rel="stylesheet" href="{% static 'kurs/styl.css' %}">
+<link rel="stylesheet" href="{% static 'kurs/styl.css' %}?v={{ wersja_statyki }}">
 </head>
 <body>
 <div class="student-tlo">
+  <div class="student-marka"><i class="dioda zielony" aria-hidden="true"></i>Sprawdzarka</div>
   <div class="student-karta">{% block tresc %}{% endblock %}</div>
 </div>
-<script src="{% static 'kurs/panel.js' %}"></script>
+<script src="{% static 'kurs/panel.js' %}?v={{ wersja_statyki }}"></script>
 </body>
 </html>

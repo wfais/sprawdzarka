@@ -1,0 +1,75 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Struktura{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Struktura</h1>
+  <p class="podtytul">Uczelnia, rok akademicki, przedmiot, grupa. Zestawy zadań i kolokwia definiujesz w przedmiocie i wydajesz grupom z ich własnymi terminami.</p></div></div>
+<div class="siatka-2">
+  <div>
+  {% for u in uczelnie %}
+    <section class="karta">
+      <div class="naglowek" style="margin-bottom:6px">
+        <h2 style="margin:0"><span class="plakietka">{{ u.skrot|upper }}</span>{{ u.nazwa }}</h2>
+        <a class="przycisk maly" href="{% url 'panel:uczelnia_edycja' u.pk %}">Edytuj</a>
+      </div>
+      {% for r in u.lata.all %}
+        <div class="kurs-w-strukturze{% if r.ukryty or r.zarchiwizowany %} wyciszony{% endif %}">
+          <div class="naglowek" style="margin-bottom:4px">
+            <h3 style="margin:0"><a href="{% url 'panel:rok' r.pk %}">{{ r.nazwa }}</a>{% if r.poligon %} <span class="znacznik zolty">dane fikcyjne</span>{% endif %}</h3>
+            {% if r.zarchiwizowany %}<span class="stan male"><i class="dioda wylaczona" aria-hidden="true"></i>zarchiwizowany</span>
+            {% elif r.ukryty %}<span class="stan male"><i class="dioda wylaczona" aria-hidden="true"></i>ukryty</span>
+            {% else %}<span class="stan male"><i class="dioda zielony" aria-hidden="true"></i>na pulpicie</span>{% endif %}
+          </div>
+          <table class="tabela">
+            {% for k in r.kursy.all %}
+            <tr class="klik{% if k.ukryty %} wyciszony{% endif %}" data-href="{% url 'panel:kurs' k.pk %}">
+              <td><a href="{% url 'panel:kurs' k.pk %}"><strong>{{ k.nazwa }}</strong></a>{% if k.kod %} <span class="kod-przedmiotu">{{ k.kod }}</span>{% endif %}</td>
+              <td class="drugie male"><span class="meta" style="margin:0"><span>grupy <b>{{ k.liczba_grup }}</b></span><span>zestawy <b>{{ k.liczba_zestawow }}</b></span><span>kolokwia <b>{{ k.liczba_kolokwiow }}</b></span></span></td>
+              <td style="text-align:right">{% if k.ukryty %}<span class="stan"><i class="dioda wylaczona" aria-hidden="true"></i>ukryty</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="slabe">Brak przedmiotów. <a href="{% url 'panel:rok' r.pk %}">Dodaj przedmiot</a> na stronie roku.</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% empty %}
+        <p class="slabe">Brak lat akademickich. Dodaj rok w formularzu obok.</p>
+      {% endfor %}
+    </section>
+  {% empty %}
+    <p class="puste">Brak uczelni. Dodaj uczelnię w formularzu obok.</p>
+  {% endfor %}
+  </div>
+  <div>
+    <div class="karta">
+      <h2>Nowy rok akademicki</h2>
+      <form method="post" class="formularz">{% csrf_token %}<input type="hidden" name="rodzaj" value="rok">
+        {{ f_roku.as_div }}
+        <button class="glowny" type="submit">Dodaj rok</button>
+      </form>
+    </div>
+    <details class="karta rozwijana"{% if f_kursu.errors %} open{% endif %}>
+      <summary><h2>Nowy przedmiot</h2></summary>
+      <form method="post" class="formularz">{% csrf_token %}<input type="hidden" name="rodzaj" value="kurs">
+        {{ f_kursu.as_div }}
+        <button type="submit">Dodaj przedmiot</button>
+      </form>
+    </details>
+    <details class="karta rozwijana"{% if f_uczelni.errors %} open{% endif %}>
+      <summary><h2>Nowa uczelnia</h2></summary>
+      <form method="post" class="formularz">{% csrf_token %}<input type="hidden" name="rodzaj" value="uczelnia">
+        {{ f_uczelni.as_div }}
+        <button type="submit">Dodaj uczelnię</button>
+      </form>
+    </details>
+    <details class="karta rozwijana">
+      <summary><h2>Wczytaj archiwum roku</h2></summary>
+      <p class="drugie male">Plik pobrany przyciskiem „Pobierz archiwum” na stronie roku (ze wszystkimi przedmiotami). Wczytasz go, gdy tego roku nie ma w bazie
+        (np. na nowym serwerze albo po usunięciu roku z bazy).</p>
+      <form method="post" action="{% url 'panel:struktura_import' %}" enctype="multipart/form-data" class="formularz">{% csrf_token %}
+        {{ f_importu.as_div }}
+        <button type="submit" data-czekaj="Wczytuję">Wczytaj</button>
+      </form>
+    </details>
+  </div>
+</div>
+{% endblock %}

@@ -84,6 +84,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "kurs.kontekst.statyka",
             ],
         },
     },
@@ -141,6 +142,15 @@ STORAGES = {
 
 LOGIN_URL = "panel:logowanie"
 LOGIN_REDIRECT_URL = "panel:pulpit"
+
+# --- Dostep do panelu ---
+# Konta GitHub (loginy, oddzielone przecinkami), ktore moga zalogowac sie do panelu przez GitHub
+PANEL_KONTA_GITHUB = [k.strip().lower().lstrip("@") for k in _env("PANEL_KONTA_GITHUB").split(",") if k.strip()]
+# Logowanie haslem (np. jako zapasowe); na serwerze mozna wylaczyc: PANEL_LOGOWANIE_HASLEM=0
+PANEL_LOGOWANIE_HASLEM = _env_bool("PANEL_LOGOWANIE_HASLEM", True)
+# Blokada po nieudanych probach logowania haslem (z jednego adresu albo na jedno konto)
+PANEL_LIMIT_PROB = int(_env("PANEL_LIMIT_PROB", "5"))
+PANEL_BLOKADA_MINUT = int(_env("PANEL_BLOKADA_MINUT", "15"))
 LOGOUT_REDIRECT_URL = "panel:logowanie"
 
 # Za odwrotnym proxy (Caddy) z HTTPS
@@ -190,16 +200,18 @@ SPRAWDZARKA_KOLEJKA = Path(_env("SPRAWDZARKA_KOLEJKA") or DANE_DIR / "kolejka")
 SPRAWDZARKA_LIMIT_TESTOW = int(_env("SPRAWDZARKA_LIMIT_TESTOW", "120"))
 
 # --- Ocena automatyczna: modele jezykowe ---
-# Lista modeli w postaci dostawca:nazwa, oddzielona przecinkami. Dostawcy: anthropic, openai, xai, openrouter, demo
+# Lista modeli w postaci dostawca:nazwa, oddzielona przecinkami. Dostawcy: anthropic, openai, xai, google, openrouter, demo
 SPRAWDZARKA_MODELE = [m.strip() for m in _env("OCENIAJACE_MODELE").split(",") if m.strip()]
 ANTHROPIC_API_KEY = _env("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = _env("OPENAI_API_KEY")
 XAI_API_KEY = _env("XAI_API_KEY")
 OPENROUTER_API_KEY = _env("OPENROUTER_API_KEY")
+GEMINI_API_KEY = _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
 ANTHROPIC_API_URL = _env("ANTHROPIC_API_URL", "https://api.anthropic.com/v1/messages")
 OPENAI_API_URL = _env("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
 XAI_API_URL = _env("XAI_API_URL", "https://api.x.ai/v1/chat/completions")
 OPENROUTER_API_URL = _env("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
+GEMINI_API_URL = _env("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent")
 SPRAWDZARKA_LIMIT_ODPOWIEDZI = int(_env("SPRAWDZARKA_LIMIT_ODPOWIEDZI", "8000"))
 SPRAWDZARKA_LIMIT_KODU = int(_env("SPRAWDZARKA_LIMIT_KODU", "150000"))
 
@@ -211,8 +223,10 @@ SPRAWDZARKA_ZASADY_OGOLNE = _env("SPRAWDZARKA_ZASADY_OGOLNE") or (
     "Oceniasz rozwiązania studentów laboratorium z programowania w Pythonie. "
     "Oceniaj zgodność z treścią zadania i kryteriami, poprawność działania oraz sensowność rozwiązania. "
     "Nie obniżaj oceny za drobiazgi stylistyczne, jeśli kryteria tego nie wymagają. "
-    "Jeżeli zadanie ma testy automatyczne, ich wynik jest wiarygodny i rozstrzyga o poprawności działania; "
-    "punkty za działanie przyznawaj proporcjonalnie do zaliczonych testów, chyba że kryteria mówią inaczej. "
+    "Jeżeli zadanie ma testy automatyczne, ich wynik to ważna wskazówka co do poprawności działania, ale zawsze "
+    "sprawdź kod sam. Niezaliczony test obniża ocenę, gdy wskazuje rzeczywisty błąd rozwiązania. Jeśli test wydaje się "
+    "błędny albo niezgodny z treścią zadania, a kod studenta jest poprawny, nie obniżaj za to oceny i napisz to "
+    "wyraźnie w uzasadnieniu (prowadzący sprawdzi test). "
     "Brak rozwiązania (pusty plik, niezmieniony szkielet) to 0 punktów."
 )
 

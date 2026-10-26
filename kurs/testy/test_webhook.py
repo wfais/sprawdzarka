@@ -12,6 +12,7 @@ PUSH = {
     "deleted": False,
     "repository": {"id": 555, "full_name": "wfais/py-z03-g4-jan", "pushed_at": 1792000000},
     "pusher": {"name": "jan"},
+    "sender": {"login": "jan", "id": 4242},
 }
 
 
@@ -58,3 +59,9 @@ def test_podpis_funkcja():
     from kurs.widoki_webhook import podpis_poprawny
     assert podpis_poprawny(b"abc", podpisz(b"abc"), "sekret-testowy")
     assert not podpis_poprawny(b"abc", podpisz(b"abcd"), "sekret-testowy")
+
+
+@pytest.mark.django_db
+def test_numer_konta_wypychajacego_zapisany(client):
+    wyslij_webhook(client, PUSH)
+    assert Wypchniecie.objects.get().autor_id == 4242

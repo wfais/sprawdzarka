@@ -1,0 +1,58 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Poprawka: {{ przydzial }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with kurs=przydzial.zestaw.kurs grupa=przydzial.grupa przydzial=przydzial only %}
+<div class="naglowek"><div>
+  <h1>Poprawka ze źródła</h1>
+  <p class="podtytul">Zmiany z repozytorium <span class="mono">{{ przydzial.zrodlo }}</span> trafią do repozytorium startowego grupy
+    i do repozytoriów studentów ({{ studentow }}). Praca studentów nie zostanie nadpisana: git scala zmiany, a przy konflikcie
+    student dostaje pull request do samodzielnego scalenia.</p>
+</div></div>
+
+<div class="karta">
+  <h2>Zmienione pliki</h2>
+  {% if pliki %}
+  <table class="tabela">
+    <tr><th>Plik</th><th>Zmiana</th></tr>
+    {% for p in pliki %}<tr><td class="mono">{{ p.sciezka }}</td><td>{{ p.rodzaj }}</td></tr>{% endfor %}
+  </table>
+  {% else %}
+  <p class="slabe">Repozytorium źródłowe nie różni się od stanu startowego grupy. Najpierw wprowadź poprawkę w repozytorium źródłowym (commit i push).</p>
+  {% endif %}
+</div>
+
+{% if pliki %}
+<div class="karta" style="max-width:820px">
+  {% if trwa %}<div class="uwaga">Poprzednia poprawka jest jeszcze wprowadzana. Poczekaj na jej zakończenie.</div>{% endif %}
+  <form method="post" class="formularz" data-potwierdz="Wprowadzić poprawkę do repozytoriów wszystkich studentów grupy?">{% csrf_token %}
+    <div>
+      <label for="opis">Opis poprawki (trafi do studentów, np. „poprawiony test test_odwracanie_graniczne”)</label>
+      <textarea id="opis" name="opis" rows="3"></textarea>
+    </div>
+    <div>
+      <label><input type="checkbox" name="autoscalanie" value="1" checked> scalaj automatycznie, gdy nie ma konfliktu</label>
+      <p class="male drugie">Odznacz, jeśli każdy student ma scalić poprawkę sam (dostanie pull request „Poprawka prowadzącego”).
+        Przy konflikcie student zawsze scala sam. Pliki testów są używane w ocenie od razu, także przed scaleniem.</p>
+    </div>
+    <div class="przyciski">
+      <button class="glowny" type="submit" data-czekaj="Wprowadzam"{% if trwa %} disabled{% endif %}>Wprowadź poprawkę</button>
+      <a class="przycisk" href="{% url 'panel:przydzial' przydzial.pk %}">Anuluj</a>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% if historia %}
+<div class="karta">
+  <h2>Wcześniejsze poprawki</h2>
+  <table class="tabela">
+    <tr><th>Nr</th><th>Data</th><th>Opis</th><th>Stan</th></tr>
+    {% for p in historia %}
+    <tr class="klik" data-href="{% url 'panel:poprawka' p.pk %}"><td><a href="{% url 'panel:poprawka' p.pk %}">{{ p.numer }}</a></td>
+      <td class="male">{{ p.utworzono|date:"d.m.Y H:i" }}</td><td class="male">{{ p.opis|truncatechars:120 }}</td>
+      <td><span class="znacznik {% if p.stan == 'gotowa' %}zielony{% elif p.stan == 'blad' %}czerwony{% elif p.w_toku %}niebieski{% else %}szary{% endif %}">{{ p.get_stan_display }}</span></td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

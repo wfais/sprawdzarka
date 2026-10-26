@@ -1,0 +1,20 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}{{ tytul }}{% endblock %}
+{% block tresc %}
+{% if kurs %}{% include "kurs/panel/_okruszki.html" with kurs=kurs only %}{% endif %}
+<div class="naglowek"><div><h1>{{ tytul }}</h1></div></div>
+<div class="karta ostrzezenie" style="max-width:720px">
+  <p>Zostaną usunięte z bazy:</p>
+  <ul>{% for p in punkty %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% if uwaga %}<p class="drugie">{{ uwaga }}</p>{% endif %}
+  <p><strong>Tej operacji nie można cofnąć.</strong></p>
+  <form method="post" class="formularz">{% csrf_token %}
+    <div><label for="potwierdzenie">Aby potwierdzić, wpisz: <code>{{ potwierdzenie }}</code></label>
+      <input type="text" id="potwierdzenie" name="potwierdzenie" autocomplete="off" autofocus></div>
+    <div class="przyciski">
+      <button class="niebezpieczny" type="submit">{{ przycisk }}</button>
+      <a class="przycisk" href="{{ wstecz }}">Anuluj</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

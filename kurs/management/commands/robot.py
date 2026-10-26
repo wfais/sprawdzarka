@@ -4,7 +4,7 @@ import time
 
 from django.core.management.base import BaseCommand
 
-from kurs import ocena, uslugi
+from kurs import ocena, poprawki, uslugi
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +31,9 @@ class Command(BaseCommand):
                 ("ocena po terminach", lambda: pelny and ocena.zakolejkuj_po_terminach()),
                 ("przerwane oceny", lambda: pelny and ocena.oznacz_przerwane()),
                 ("kolejka ocen", lambda: ocena.przetworz_kolejke(limit=3)),
+                ("poprawki", lambda: poprawki.przetworz(limit=1)),
+                ("przerwane poprawki", lambda: pelny and poprawki.wznow_przerwane()),
+                ("scalenia poprawek", lambda: pelny and poprawki.sprawdz_scalenia()),
             ):
                 try:
                     zadanie()

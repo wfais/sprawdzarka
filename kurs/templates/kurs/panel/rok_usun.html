@@ -1,0 +1,21 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Usuń z bazy: {{ rok }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with rok=rok only %}
+<div class="naglowek"><div><h1>Usuń z bazy: rok {{ rok.pelna_nazwa }}</h1></div></div>
+<div class="karta ostrzezenie" style="max-width:720px">
+  <p>Z bazy zostaną usunięte: przedmioty ({{ przedmiotow }}), grupy ({{ grup }}), zestawy i kolokwia ({{ zestawow }})
+    z zadaniami i PDF, zgłoszenia studentów ({{ zgloszen }}) z ocenami. Konta studentów zostają (mogą być w innych latach).
+    Repozytoria na GitHubie nie są ruszane.</p>
+  {% if rok.poligon %}<p>To rok z poligonu (dane fikcyjne). Fikcyjne konta bez innych zgłoszeń też znikną.</p>
+  {% else %}<p><strong>Najpierw <a href="{% url 'panel:rok_eksport' rok.pk %}">pobierz plik archiwum</a></strong>: tylko z niego odtworzysz ten rok.</p>{% endif %}
+  <form method="post" class="formularz">{% csrf_token %}
+    <div><label for="potwierdzenie">Aby potwierdzić, wpisz: <code>{{ rok.nazwa }}</code></label>
+      <input type="text" id="potwierdzenie" name="potwierdzenie" autocomplete="off"></div>
+    <div class="przyciski">
+      <button class="niebezpieczny" type="submit">Usuń z bazy</button>
+      <a class="przycisk" href="{% url 'panel:rok' rok.pk %}">Anuluj</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

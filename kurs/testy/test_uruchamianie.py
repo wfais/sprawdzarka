@@ -228,3 +228,30 @@ def test_zmiany_plikow_prowadzacego(tmp_path):
     }
     # Bez zmian w testach: puste listy
     assert uruchamianie.zmiany_plikow_prowadzacego(baza, baza) == {"zmienione": [], "usuniete": [], "dodane": []}
+
+
+def test_blad_skladni_w_jednym_zadaniu_nie_zatrzymuje_pozostalych(tmp_path):
+    drzewo = zapisz(tmp_path / "drzewo", {
+        "ZADANIE1/__init__.py": "", "ZADANIE1/tests/__init__.py": "",
+        "ZADANIE1/zadanie1.py": "def f():\n    pass\n\nx, y = # wczytaj dane\n",
+        "ZADANIE1/tests/test_zadanie1.py": "from ZADANIE1.zadanie1 import f\n\ndef test_f():\n    assert f() is None\n",
+        "ZADANIE2/__init__.py": "", "ZADANIE2/tests/__init__.py": "",
+        "ZADANIE2/zadanie2.py": "def g(L):\n    return L\n",
+        "ZADANIE2/tests/test_zadanie2.py": (
+            "from ZADANIE2.zadanie2 import g\n\ndef test_pusta():\n    assert g([]) == []\n\n"
+            "def test_odwrotna():\n    assert g([1, 2]) == [2, 1]\n"),
+    })
+    wynik = uruchamianie.uruchom_pytest(drzewo, 60)
+    przypadki = {(p["plik"], p["nazwa"]): p for p in wynik["przypadki"]}
+    blad = przypadki[("ZADANIE1/tests/test_zadanie1.py", "ZADANIE1.tests.test_zadanie1")]
+    assert blad["wynik"] == "blad" and blad["wczytanie"]
+    assert blad["powod"] == "SyntaxError: invalid syntax (ZADANIE1/zadanie1.py, linia 4)"
+    assert str(drzewo) not in blad["komunikat"]
+    assert przypadki[("ZADANIE2/tests/test_zadanie2.py", "test_pusta")]["wynik"] == "zdany"
+    niezdany = przypadki[("ZADANIE2/tests/test_zadanie2.py", "test_odwrotna")]
+    assert niezdany["wynik"] == "niezdany" and niezdany["powod"].startswith("assert [1, 2] == [2, 1]")
+
+
+def test_skrot_bledu():
+    assert uruchamianie.skrot_bledu("x\nE   ZeroDivisionError: division by zero\n") == "ZeroDivisionError: division by zero"
+    assert uruchamianie.skrot_bledu("assert 1 == 2\nE   assert 1 == 2\nE    +  where 1 = f()") == "assert 1 == 2"

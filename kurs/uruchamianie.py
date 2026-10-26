@@ -18,6 +18,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -122,15 +123,33 @@ def przygotuj_drzewo_testow(baza: Path, kod: Path, cel: Path, wzorce: Optional[l
     return dziennik
 
 
-def zmiany_plikow_prowadzacego(baza: Path, kod: Path) -> dict:
-    """Pliki testow, ich danych i konfiguracji pytest, ktore student zmienil, usunal lub dodal."""
+def skrot_git(dane: bytes) -> str:
+    """Skrot zawartosci pliku w git (blob), jak w drzewach GitHub."""
+    import hashlib
+
+    return hashlib.sha1(b"blob %d\0" % len(dane) + dane).hexdigest()
+
+
+def w_wersji_prowadzacego(sciezka: str, dane: Optional[bytes], dozwolone: Optional[dict]) -> bool:
+    """Czy plik (None: brak pliku) ma jedna z wersji prowadzacego (wczesniejsze stany startowe, jego poprawki)."""
+    if not dozwolone or sciezka not in dozwolone:
+        return False
+    return (skrot_git(dane) if dane is not None else None) in dozwolone[sciezka]
+
+
+def zmiany_plikow_prowadzacego(baza: Path, kod: Path, dozwolone: Optional[dict] = None) -> dict:
+    """Pliki testow, ich danych i konfiguracji pytest, ktore student zmienil, usunal lub dodal.
+
+    dozwolone: wersje plikow od prowadzacego (sciezka -> skroty), ktore nie sa zmianami studenta.
+    """
     baza, kod = Path(baza), Path(kod)
     w_bazie = {p for p in lista_plikow(baza) if nalezy_do_prowadzacego(p)}
     w_kodzie = {p for p in lista_plikow(kod) if nalezy_do_prowadzacego(p)}
     return {
-        "zmienione": sorted(p for p in w_bazie & w_kodzie if (baza / p).read_bytes() != (kod / p).read_bytes()),
-        "usuniete": sorted(w_bazie - w_kodzie),
-        "dodane": sorted(w_kodzie - w_bazie),
+        "zmienione": sorted(p for p in w_bazie & w_kodzie if (baza / p).read_bytes() != (kod / p).read_bytes()
+                            and not w_wersji_prowadzacego(p, (kod / p).read_bytes(), dozwolone)),
+        "usuniete": sorted(p for p in w_bazie - w_kodzie if not w_wersji_prowadzacego(p, None, dozwolone)),
+        "dodane": sorted(p for p in w_kodzie - w_bazie if not w_wersji_prowadzacego(p, (kod / p).read_bytes(), dozwolone)),
     }
 
 
@@ -252,7 +271,30 @@ def _zabij_wszystkie_procesy(uid: int) -> None:
     os.waitpid(pid, 0)
 
 
-def _odczytaj_junit(sciezka: Path) -> list[dict]:
+_WYJATEK = re.compile(r"^[A-Za-z_][\w.]*(Error|Exception|Exit|Interrupt)\b")
+_MIEJSCE = re.compile(r'File "([^"]+)", line (\d+)')
+
+
+def skrot_bledu(komunikat: str, drzewo: str = "") -> str:
+    """Jedno zdanie o przyczynie: wyjatek albo niespelniona asercja, przy bledzie skladni z plikiem i linia."""
+    linie_e = [linia[1:].strip() for linia in komunikat.splitlines() if linia.startswith("E ")]
+    linie_e = [linia for linia in linie_e if linia]
+    powod = next((linia for linia in reversed(linie_e) if _WYJATEK.match(linia)), "")
+    if not powod:
+        powod = next((linia for linia in linie_e if linia.startswith("assert")), "")
+    if not powod:
+        powod = linie_e[-1] if linie_e else (komunikat.strip().splitlines() or [""])[0]
+    if powod.startswith(("SyntaxError", "IndentationError", "TabError")):
+        miejsce = _MIEJSCE.search(komunikat)
+        if miejsce:
+            plik = miejsce.group(1).replace("\\", "/")
+            if drzewo:
+                plik = plik.replace(drzewo.replace("\\", "/").rstrip("/") + "/", "")
+            powod += f" ({plik}, linia {miejsce.group(2)})"
+    return powod[:300]
+
+
+def _odczytaj_junit(sciezka: Path, drzewo: str = "") -> list[dict]:
     if not sciezka.is_file():
         return []
     try:
@@ -268,12 +310,17 @@ def _odczytaj_junit(sciezka: Path) -> list[dict]:
                 wynik = nazwa_wyniku
                 komunikat = ((element.get("message") or "") + "\n" + (element.text or "")).strip()
                 break
+        if drzewo:
+            komunikat = komunikat.replace(drzewo + os.sep, "").replace(drzewo.replace("\\", "/") + "/", "")
         przypadki.append({
             "nazwa": przypadek.get("name", ""),
             "klasa": przypadek.get("classname", ""),
             "plik": (przypadek.get("file") or "").replace("\\", "/"),
             "wynik": wynik,
             "komunikat": komunikat[-1500:],
+            "powod": skrot_bledu(komunikat, drzewo) if wynik in ("niezdany", "blad") else "",
+            # Blad wczytania pliku testow (np. blad skladni w kodzie studenta): zaden test z pliku sie nie wykonal
+            "wczytanie": wynik == "blad" and komunikat.startswith("collection failure"),
         })
     return przypadki
 
@@ -299,6 +346,8 @@ def uruchom_pytest(drzewo: Path, limit_czasu: int = 120, uid: Optional[int] = No
                 _oddaj(katalog, uid)
         argumenty = [
             "-q", "-p", "no:cacheprovider", "-o", "junit_family=xunit1",
+            # Blad w pliku jednego zadania (np. skladni) nie moze zatrzymac testow pozostalych zadan
+            "--continue-on-collection-errors",
             f"--junitxml={raport}", "--rootdir", str(drzewo), str(drzewo),
         ]
         polecenie = [sys.executable, "-s", "-B", "-X", "utf8", "-c",
@@ -330,7 +379,7 @@ def uruchom_pytest(drzewo: Path, limit_czasu: int = 120, uid: Optional[int] = No
             wyjscie = plik_wyjscia.read()[-20000:].decode("utf-8", errors="replace")
         if przekroczono:
             wyjscie += f"\nPrzekroczono limit czasu {limit_czasu} s."
-        przypadki = _odczytaj_junit(raport)
+        przypadki = _odczytaj_junit(raport, str(drzewo))
     for przypadek in przypadki:
         if przypadek["plik"].startswith(str(drzewo)):
             przypadek["plik"] = Path(przypadek["plik"]).relative_to(drzewo).as_posix()

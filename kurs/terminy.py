@@ -35,6 +35,9 @@ def pasuje_do_wzorcow(sciezka: str, wzorce: Sequence[str]) -> bool:
 class Push:
     czas: datetime
     sha_po: str
+    sha_przed: str = ""
+    # False: wypchniecie z innego konta niz konto studenta (np. prowadzacego); nie liczy sie do terminow
+    wlasny: bool = True
 
 
 @dataclass
@@ -78,32 +81,51 @@ def oblicz(
     sha_bazowy      - stan startowy (galaz feedback), od niego liczymy "czy cos oddano"
     sha_poczatkowy  - pierwszy stan galezi main (przed jakimkolwiek wypchnieciem studenta)
     kod_zmieniony   - funkcja (sha_od, sha_do) -> czy zmienil sie jakis plik z kodem
+
+    Wypchniecia z innych kont (wlasny=False, np. poprawki prowadzacego) zmieniaja stan repozytorium,
+    ale nie licza sie jako praca studenta: zmiana w danym okresie musi pochodzic z wypchniecia studenta
+    (porownanie stanu tuz przed jego wypchnieciem ze stanem po nim).
     """
-    pushe = sorted((p for p in pushe if p.sha_po and p.sha_po != ZERO_SHA), key=lambda p: p.czas)
-    sha_m = stan_na(pushe, termin_miekki, sha_poczatkowy)
-    sha_t = stan_na(pushe, termin_twardy, sha_poczatkowy)
-    sha_n = pushe[-1].sha_po if pushe else sha_poczatkowy
+    wszystkie = sorted((p for p in pushe if p.sha_po and p.sha_po != ZERO_SHA), key=lambda p: p.czas)
+    pushe = [p for p in wszystkie if p.wlasny]
+    sa_obce = len(pushe) != len(wszystkie)
+    sha_m = stan_na(wszystkie, termin_miekki, sha_poczatkowy)
+    sha_t = stan_na(wszystkie, termin_twardy, sha_poczatkowy)
+    sha_n = wszystkie[-1].sha_po if wszystkie else sha_poczatkowy
 
     def zmiana(od: str, do: str) -> bool:
         return od != do and kod_zmieniony(od, do)
+
+    def od_studenta(od_czasu: Optional[datetime], do_czasu: Optional[datetime]) -> bool:
+        """Czy w okresie (od_czasu, do_czasu] student sam zmienil kod. Bez obcych wypchniec zawsze prawda."""
+        if not sa_obce:
+            return True
+        poprzedni = sha_poczatkowy
+        for p in pushe:
+            przed = p.sha_przed if p.sha_przed and p.sha_przed != ZERO_SHA else poprzedni
+            w_okresie = (od_czasu is None or p.czas > od_czasu) and (do_czasu is None or p.czas <= do_czasu)
+            if w_okresie and zmiana(przed, p.sha_po):
+                return True
+            poprzedni = p.sha_po
+        return False
 
     def wynik(kolor, opis, mnoznik, oceniany):
         return WynikTerminow(kolor, opis, mnoznik, oceniany, sha_m, sha_t, sha_n)
 
     if teraz < termin_miekki:
-        if zmiana(sha_bazowy, sha_n):
+        if zmiana(sha_bazowy, sha_n) and od_studenta(None, None):
             return wynik(NIEBIESKI, "Przed terminem, są już zmiany w kodzie.", None, sha_n)
         return wynik(SZARY, "Przed terminem, brak zmian w kodzie.", None, "")
 
-    kod_do_terminu_ostatecznego = zmiana(sha_bazowy, sha_t)
-    po_terminie_ostatecznym = zmiana(sha_t, sha_n)
+    kod_do_terminu_ostatecznego = zmiana(sha_bazowy, sha_t) and od_studenta(None, termin_twardy)
+    po_terminie_ostatecznym = zmiana(sha_t, sha_n) and od_studenta(termin_twardy, None)
 
     if not kod_do_terminu_ostatecznego:
         if po_terminie_ostatecznym:
             return wynik(CZERWONY, "Kod oddany wyłącznie po terminie ostatecznym.", Decimal("0"), sha_n)
         return wynik(SZARY, "Brak oddanego kodu.", None, "")
 
-    if zmiana(sha_m, sha_t):
+    if zmiana(sha_m, sha_t) and od_studenta(termin_miekki, termin_twardy):
         kolor = ZOLTY
         opis = f"Zmiany w kodzie po terminie (sugerowany mnożnik {_liczba(mnoznik_spoznienia)})."
         mnoznik = mnoznik_spoznienia

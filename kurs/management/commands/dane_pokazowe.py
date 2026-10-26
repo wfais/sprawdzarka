@@ -8,7 +8,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from kurs.models import (
-    Ewaluacja, Grupa, OcenaZadania, OpiniaModelu, Przydzial, Student, Wypchniecie, Zadanie, Zestaw, Zgloszenie,
+    Ewaluacja, Grupa, Kurs, OcenaZadania, OpiniaModelu, Przydzial, Rok, Student, Uczelnia, Wypchniecie, Zadanie,
+    Zestaw, Zgloszenie,
 )
 
 D = Decimal
@@ -36,14 +37,20 @@ class Command(BaseCommand):
         if not Uzytkownik.objects.filter(username="prowadzacy").exists():
             Uzytkownik.objects.create_superuser("prowadzacy", "", opcje["haslo"])
         teraz = timezone.now()
-        g3, _ = Grupa.objects.get_or_create(skrot="g3", defaults={"nazwa": "Grupa 3", "opis": "wtorek 8:00"})
-        g4, _ = Grupa.objects.get_or_create(skrot="g4", defaults={"nazwa": "Grupa 4", "opis": "wtorek 10:00"})
-        g6, _ = Grupa.objects.get_or_create(skrot="g6", defaults={"nazwa": "Grupa 6", "opis": "czwartek 12:00"})
-        z3, _ = Zestaw.objects.get_or_create(skrot="z03", defaults={
+        uj, _ = Uczelnia.objects.get_or_create(skrot="uj", defaults={"nazwa": "Uniwersytet Jagielloński"})
+        rok, _ = Rok.objects.get_or_create(uczelnia=uj, skrot="2627", defaults={"nazwa": "2026/2027"})
+        kurs, _ = Kurs.objects.get_or_create(rok=rok, skrot="py", defaults={"nazwa": "Język Python", "kod": "WFAIS.IF-X204.0"})
+        g3, _ = Grupa.objects.get_or_create(kurs=kurs, skrot="g3", defaults={"nazwa": "Grupa 3", "opis": "wtorek 8:00 - 9:30, sala G-1-03"})
+        g4, _ = Grupa.objects.get_or_create(kurs=kurs, skrot="g4", defaults={"nazwa": "Grupa 4", "opis": "wtorek 10:10 - 11:40, sala G-1-03"})
+        g6, _ = Grupa.objects.get_or_create(kurs=kurs, skrot="g6", defaults={"nazwa": "Grupa 6", "opis": "czwartek 12:00 - 13:30, sala G-0-11"})
+        k1, _ = Zestaw.objects.get_or_create(kurs=kurs, skrot="k1", defaults={
+            "nazwa": "Kolokwium 1", "rodzaj": Zestaw.Rodzaj.KOLOKWIUM, "repo_zrodlowe": "wfais/python-kolokwium1",
+            "punkty_max": D(10)})
+        z3, _ = Zestaw.objects.get_or_create(kurs=kurs, skrot="z03", defaults={
             "nazwa": "Zestaw 3: funkcje i kolekcje", "repo_zrodlowe": "wfais/python-zestaw3", "punkty_max": D(5),
             "tresc_tekst": "Zadanie 1 (1 pkt): funkcja suma...\nZadanie 2 (1 pkt): gra w kości z interfejsem tkinter...",
         })
-        z4, _ = Zestaw.objects.get_or_create(skrot="z04", defaults={
+        z4, _ = Zestaw.objects.get_or_create(kurs=kurs, skrot="z04", defaults={
             "nazwa": "Zestaw 4: klasy", "repo_zrodlowe": "wfais/python-zestaw4", "punkty_max": D(5)})
         for numer, (kod, tryb) in enumerate([("ZADANIE1", "testy_modele"), ("ZADANIE2", "modele"),
                                              ("ZADANIE3", "testy_modele"), ("ZADANIE4", "testy_modele"),
@@ -52,15 +59,19 @@ class Command(BaseCommand):
                 "kolejnosc": numer, "katalog": f"{kod}/", "punkty": D(1), "tryb": tryb,
                 "kryteria": "Rozwiązanie zgodne z treścią, obsługa przypadków brzegowych."})
         przydzialy = []
-        for grupa, przesuniecie in ((g3, -9), (g4, -2), (g6, 5)):
+        for grupa, przesuniecie in ((g3, -18), (g4, -2), (g6, 5)):
             p, _ = Przydzial.objects.get_or_create(zestaw=z3, grupa=grupa, defaults={
-                "przedrostek_repo": f"py-z03-{grupa.skrot}", "termin_miekki": teraz + timedelta(days=przesuniecie),
+                "przedrostek_repo": f"py-z03-{grupa.skrot}-", "termin_miekki": teraz + timedelta(days=przesuniecie),
                 "termin_twardy": teraz + timedelta(days=przesuniecie + 7),
                 "repo_startowe": f"wfais/py-z03-{grupa.skrot}-start", "sha_startowy": "a" * 40})
             przydzialy.append(p)
         Przydzial.objects.get_or_create(zestaw=z4, grupa=g4, defaults={
-            "przedrostek_repo": "py-z04-g4", "termin_miekki": teraz + timedelta(days=12),
+            "przedrostek_repo": "py-z04-g4-", "publikacja": teraz + timedelta(days=3), "termin_miekki": teraz + timedelta(days=12),
             "termin_twardy": teraz + timedelta(days=19), "repo_startowe": "wfais/py-z04-g4-start", "sha_startowy": "a" * 40})
+        Przydzial.objects.get_or_create(zestaw=k1, grupa=g6, defaults={
+            "przedrostek_repo": "py-k1-g6-", "termin_miekki": teraz + timedelta(days=20, hours=1),
+            "termin_twardy": teraz + timedelta(days=20, hours=2), "repo_startowe": "wfais/py-k1-g6-start",
+            "sha_startowy": "a" * 40})
 
         p = przydzialy[0]
         for numer, (login, nazwisko, kolor, opis) in enumerate(STUDENCI):

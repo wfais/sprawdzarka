@@ -1,0 +1,45 @@
+{% extends "kurs/panel/baza.html" %}
+{% block naglowek_strony %}{% if poprawka.w_toku %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block tytul %}Poprawka {{ poprawka.numer }}: {{ przydzial }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with kurs=przydzial.zestaw.kurs grupa=przydzial.grupa przydzial=przydzial only %}
+<div class="naglowek">
+  <div>
+    <h1>Poprawka nr {{ poprawka.numer }}</h1>
+    <p class="podtytul">{{ poprawka.utworzono|date:"d.m.Y H:i" }} ·
+      {% if poprawka.autoscalanie %}scalana automatycznie, gdy nie ma konfliktu{% else %}każdy student scala sam{% endif %}
+      {% if poprawka.opis %}<br>{{ poprawka.opis }}{% endif %}</p>
+  </div>
+  {% if not poprawka.w_toku and poprawka.stan == "gotowa" %}
+  <form method="post" class="w-linii">{% csrf_token %}
+    <button type="submit" data-czekaj="Sprawdzam">Sprawdź, kto już scalił</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="karta">
+  <p><span class="znacznik {% if poprawka.stan == 'gotowa' %}zielony{% elif poprawka.stan == 'blad' %}czerwony{% elif poprawka.w_toku %}niebieski{% else %}szary{% endif %}">{{ poprawka.get_stan_display }}</span>
+    {% if poprawka.w_toku %}<span class="drugie">Trwa wprowadzanie. Strona odświeża się sama.</span>{% endif %}
+    {% for etykieta, n in liczniki.items %}<span class="znacznik szary">{{ etykieta }}: {{ n }}</span> {% endfor %}</p>
+  {% if poprawka.blad_opis %}<p class="blad-tekst">{{ poprawka.blad_opis }}</p>{% endif %}
+  {% if poprawka.pliki %}<details><summary class="male">Zmienione pliki ({{ poprawka.pliki|length }})</summary>
+    <ul class="male mono">{% for p in poprawka.pliki %}<li>{{ p.sciezka }} ({{ p.rodzaj }})</li>{% endfor %}</ul></details>{% endif %}
+</div>
+
+{% if wpisy %}
+<div class="karta przewijanie">
+  <table class="tabela">
+    <tr><th>Student</th><th>Stan</th><th>Konflikty</th><th>Uwagi</th><th>GitHub</th></tr>
+    {% for w in wpisy %}
+    <tr>
+      <td><a href="{% url 'panel:zgloszenie' w.zgloszenie.pk %}">{{ w.zgloszenie.student }}</a></td>
+      <td><span class="znacznik {% if w.stan == 'scalona' or w.stan == 'scalona_student' %}zielony{% elif w.stan == 'do_scalenia' %}zolty{% elif w.stan == 'blad' %}czerwony{% else %}szary{% endif %}">{{ w.get_stan_display }}</span></td>
+      <td class="male mono">{{ w.konflikty|join:", " }}</td>
+      <td class="male">{{ w.komunikat }}</td>
+      <td class="male">{% if w.url_pr %}<a href="{{ w.url_pr }}" target="_blank" rel="noopener">pull request</a>{% elif w.zgloszenie.url_repo %}<a href="{{ w.zgloszenie.url_repo }}" target="_blank" rel="noopener">repo</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

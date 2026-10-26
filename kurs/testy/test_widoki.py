@@ -97,26 +97,38 @@ def test_student_nie_jest_prowadzacym(client, django_user_model):
 
 @pytest.mark.django_db
 def test_pelny_przebieg_panelu(client, github, prowadzacy):
+    from kurs.models import Kurs, Rok, Uczelnia
     assert client.get("/panel/").status_code == 200
-    odp = client.post("/panel/grupy/", {"nazwa": "Grupa 6", "skrot": "g6", "opis": "", "aktywna": "on"})
+    uj = Uczelnia.objects.get(skrot="uj")
+    odp = client.post("/panel/struktura/", {"rodzaj": "rok", "r-uczelnia": uj.pk, "r-nazwa": "2026/2027", "r-skrot": ""})
+    assert odp.status_code == 302
+    rok = Rok.objects.get(uczelnia=uj)
+    assert rok.skrot == "2627"
+    odp = client.post(f"/panel/lata/{rok.pk}/", {"k-nazwa": "Język Python", "k-skrot": "py"})
+    assert odp.status_code == 302
+    kurs = Kurs.objects.get(skrot="py")
+    assert kurs.rok == rok
+    odp = client.post(f"/panel/kursy/{kurs.pk}/", {"g-nazwa": "Grupa 6", "g-skrot": "g6", "g-opis": "", "g-aktywna": "on"})
     assert odp.status_code == 302
     grupa = Grupa.objects.get(skrot="g6")
-    odp = client.post("/panel/zestawy/nowy/", {
-        "nazwa": "Zestaw 1", "skrot": "z01", "repo_zrodlowe": "https://github.com/wfais/py-z1.git",
+    assert grupa.kurs == kurs
+    odp = client.post(f"/panel/kursy/{kurs.pk}/nowy-zestaw/", {
+        "rodzaj": "zestaw", "nazwa": "Zestaw 1", "skrot": "z01", "repo_zrodlowe": "https://github.com/wfais/py-z1.git",
         "wzorce_kodu": "*.py", "punkty_max": "5",
     })
     assert odp.status_code == 302
     zestaw = Zestaw.objects.get(skrot="z01")
-    assert zestaw.repo_zrodlowe == "wfais/py-z1"
+    assert zestaw.repo_zrodlowe == "wfais/py-z1" and zestaw.kurs == kurs
     odp = client.post(f"/panel/zestawy/{zestaw.pk}/", {
         "grupa": grupa.pk, "termin_miekki": "2026-10-26T23:59", "termin_twardy": "2026-11-02T23:59",
         "przedrostek_repo": "", "otwarty": "on",
     })
     assert odp.status_code == 302
     przydzial = Przydzial.objects.get()
-    assert przydzial.przedrostek_repo == "py-z01-g6"
-    assert przydzial.repo_startowe == "wfais/py-z01-g6-start"
-    assert github.migawki == [("wfais/py-z1", "wfais/py-z01-g6-start")]
+    assert przydzial.przedrostek_repo == "uj-py2627-z01-g6-"
+    assert przydzial.repo_startowe == "wfais/uj-py2627-z01-g6-start"
+    assert github.migawki == [("wfais/py-z1", "wfais/uj-py2627-z01-g6-start")]
+    assert "Grupa 6" in client.get("/panel/").content.decode()
     tresc = client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
     assert przydzial.link_akceptacji in tresc
 
@@ -184,6 +196,14 @@ def test_terminy_w_zlej_kolejnosci_odrzucone(client, github, prowadzacy, zestaw,
 
 
 @pytest.mark.django_db
+def test_style_z_wersja(client, prowadzacy):
+    """Adres arkusza zawiera wersje, wiec po aktualizacji przegladarka nie uzyje starego z pamieci."""
+    import re
+    strona = client.get("/panel/").content.decode()
+    assert re.search(r'kurs/styl\.css\?v=[1-9][0-9]+"', strona)
+
+
+@pytest.mark.django_db
 def test_zdrowie(client):
     assert client.get("/zdrowie/").content == b"ok"
 
@@ -193,18 +213,32 @@ def test_wszystkie_strony_panelu_sie_otwieraja(client, github, prowadzacy, przyd
     from kurs import uslugi
     z = uslugi.akceptuj(przydzial, 99, "ewa", "")
     Student.objects.filter(pk=z.student_id).update(kandydat_readme="Ewa Lis")
+    kurs = przydzial.zestaw.kurs
+    rok = kurs.rok
     adresy = [
-        "/panel/", "/panel/grupy/", f"/panel/grupy/{przydzial.grupa.pk}/", "/panel/zestawy/",
-        "/panel/zestawy/nowy/", f"/panel/zestawy/{przydzial.zestaw.pk}/",
+        "/panel/", "/panel/struktura/", "/panel/administracja/", f"/panel/lata/{rok.pk}/", f"/panel/lata/{rok.pk}/edycja/",
+        f"/panel/kursy/{kurs.pk}/", f"/panel/kursy/{kurs.pk}/edycja/",
+        f"/panel/kursy/{kurs.pk}/kopiuj/", f"/panel/kursy/{kurs.pk}/usun/",
+        f"/panel/grupy/{przydzial.grupa.pk}/usun/", f"/panel/zestawy/{przydzial.zestaw.pk}/usun/",
+        f"/panel/przydzialy/{przydzial.pk}/usun/",
+        f"/panel/kursy/{kurs.pk}/nowy-zestaw/", f"/panel/kursy/{kurs.pk}/nowy-zestaw/?rodzaj=kolokwium",
+        f"/panel/lata/{rok.pk}/archiwum.json", f"/panel/uczelnie/{rok.uczelnia_id}/",
+        f"/panel/grupy/{przydzial.grupa.pk}/", f"/panel/grupy/{przydzial.grupa.pk}/edycja/",
+        f"/panel/zestawy/{przydzial.zestaw.pk}/", f"/panel/zestawy/{przydzial.zestaw.pk}/kopiuj/",
         f"/panel/zestawy/{przydzial.zestaw.pk}/edycja/", f"/panel/przydzialy/{przydzial.pk}/",
-        f"/panel/przydzialy/{przydzial.pk}/edycja/", f"/panel/przydzialy/{przydzial.pk}/?kolor=zielony",
-        f"/panel/przydzialy/{przydzial.pk}/?kolor=problemy", f"/panel/przydzialy/{przydzial.pk}/?kolor=testy",
+        f"/panel/przydzialy/{przydzial.pk}/kopiuj/",
+        f"/panel/przydzialy/{przydzial.pk}/edycja/", f"/panel/przydzialy/{przydzial.pk}/?stan=w_terminie",
+        f"/panel/przydzialy/{przydzial.pk}/?stan=blad", f"/panel/przydzialy/{przydzial.pk}/?stan=testy",
+        f"/panel/przydzialy/{przydzial.pk}/?stan=do_oceny",
         f"/panel/zgloszenia/{z.pk}/",
         "/panel/studenci/", "/panel/studenci/?filtr=bez&q=ewa", "/admin/", "/admin/kurs/zgloszenie/",
     ]
     for adres in adresy:
         odp = client.get(adres)
         assert odp.status_code == 200, adres
+    # Dawne listy prowadza do struktury
+    assert client.get("/panel/grupy/")["Location"] == "/panel/struktura/"
+    assert client.get("/panel/zestawy/")["Location"] == "/panel/struktura/"
 
 
 @pytest.mark.django_db
@@ -256,10 +290,37 @@ def test_znacznik_zmienionych_testow_w_panelu(client, github, prowadzacy, przydz
     Zgloszenie.objects.filter(pk=z1.pk).update(
         testy_zmienione=True, zmiany_testow={"zmienione": ["ZADANIE1/tests/test_main.py"]})
     lista = client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
-    assert "zmienione testy 1" in lista and "ZADANIE1/tests/test_main.py" in lista
-    filtr = client.get(f"/panel/przydzialy/{przydzial.pk}/?kolor=testy").content.decode()
+    assert "<b>1</b> zmienione testy" in lista and "ZADANIE1/tests/test_main.py" in lista
+    filtr = client.get(f"/panel/przydzialy/{przydzial.pk}/?stan=testy").content.decode()
     assert "Ewa Lis" in filtr and "Jan Nowak" not in filtr
     karta = client.get(f"/panel/zgloszenia/{z1.pk}/").content.decode()
     assert "Student zmienił pliki testów" in karta
     pulpit = client.get("/panel/").content.decode()
-    assert "zmienione testy 1" in pulpit
+    assert "<b>1</b> zmienione testy" in pulpit
+
+
+@pytest.mark.django_db
+def test_karta_oznacza_pominiete_wypchniecia(client, github, prowadzacy, przydzial):
+    from django.utils import timezone
+
+    from kurs import uslugi
+    from kurs.models import Wypchniecie
+    z = uslugi.akceptuj(przydzial, 101, "ewa", "Ewa Lis")
+    Wypchniecie.objects.create(repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed="c" * 40,
+                               sha_po="d" * 40, czas=timezone.now(), autor="witoldprzygoda", autor_id=5,
+                               zrodlo="aktywnosc")
+    karta = client.get(f"/panel/zgloszenia/{z.pk}/").content.decode()
+    assert "pominięte" in karta
+
+
+@pytest.mark.django_db
+def test_przedrostek_z_formularza_bez_zmian(github, prowadzacy, zestaw):
+    from kurs.forms import FormularzPrzydzialu
+    from kurs.models import Grupa
+    grupa = Grupa.objects.create(kurs=zestaw.kurs, nazwa="Grupa 9", skrot="g9")
+    formularz = FormularzPrzydzialu(data={
+        "grupa": grupa.pk, "termin_miekki": "2026-11-01T10:00", "termin_twardy": "2026-11-08T10:00",
+        "przedrostek_repo": "set0_", "otwarty": "on",
+    }, zestaw=zestaw)
+    assert formularz.is_valid(), formularz.errors
+    assert formularz.cleaned_data["przedrostek_repo"] == "set0_"

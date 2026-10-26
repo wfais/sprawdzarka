@@ -2,23 +2,29 @@
 {% block naglowek_strony %}{% if w_toku %}<meta http-equiv="refresh" content="15">{% endif %}{% endblock %}
 {% block tytul %}{{ przydzial.zestaw.nazwa }}, {{ przydzial.grupa.nazwa }}{% endblock %}
 {% block tresc %}
-<div class="okruszki"><a href="{% url 'panel:zestaw' przydzial.zestaw.pk %}">{{ przydzial.zestaw.nazwa }}</a></div>
+{% include "kurs/panel/_okruszki.html" with kurs=przydzial.zestaw.kurs grupa=przydzial.grupa zestaw=przydzial.zestaw only %}
 <div class="naglowek">
   <div>
     <h1>{{ przydzial.grupa.nazwa }}: {{ przydzial.zestaw.nazwa }}</h1>
-    <p class="podtytul">Termin {{ przydzial.termin_miekki|date:"d.m.Y H:i" }} · ostateczny {{ przydzial.termin_twardy|date:"d.m.Y H:i" }}
-      · {% if przydzial.otwarty %}przyjmuje zgłoszenia{% else %}<strong>zamknięty dla nowych zgłoszeń</strong>{% endif %}</p>
+    <p class="meta">{% with p=przydzial %}{% include "kurs/panel/_stan_zestawu.html" %}{% endwith %}
+      {% if przydzial.publikacja %}<span>{% if przydzial.opublikowany %}opublikowany{% else %}publikacja{% endif %} <b>{{ przydzial.publikacja|date:"d.m.Y H:i" }}</b></span>{% endif %}
+      <span>termin <b>{{ przydzial.termin_miekki|date:"d.m.Y H:i" }}</b></span>
+      <span>ostateczny <b>{{ przydzial.termin_twardy|date:"d.m.Y H:i" }}</b></span>
+      <span>{% if przydzial.otwarty %}przyjmuje zgłoszenia{% else %}<b>zamknięty dla nowych zgłoszeń</b>{% endif %}</span></p>
+    {% if przydzial.repo_zrodlowe %}<p class="meta"><span>inne repozytorium źródłowe <a class="mono" href="https://github.com/{{ przydzial.repo_zrodlowe }}" target="_blank" rel="noopener">{{ przydzial.repo_zrodlowe }}</a></span></p>{% endif %}
   </div>
   <div class="przyciski">
     <form method="post" action="{% url 'panel:przydzial_odswiez' przydzial.pk %}" class="w-linii">{% csrf_token %}
       <button type="submit" data-czekaj="Odświeżam">Odśwież z GitHub</button>
     </form>
     <form method="post" action="{% url 'panel:przydzial_ocen' przydzial.pk %}" class="w-linii"
-          data-potwierdz="Uruchomić testy i ocenę modelami dla wszystkich oddanych prac bez oceny?">{% csrf_token %}
+          data-potwierdz="Ocenić wszystkie oddane prace, które nie mają aktualnej oceny (także po zmianie zadań lub modeli)?">{% csrf_token %}
       <button type="submit" class="glowny" data-czekaj="Dodaję do kolejki">Oceń automatycznie</button>
     </form>
     <a class="przycisk" href="{% url 'panel:przydzial_lista_repo' przydzial.pk %}">Lista repozytoriów</a>
+    <a class="przycisk" href="{% url 'panel:przydzial_poprawka' przydzial.pk %}" title="Przenieś zmiany z repozytorium źródłowego do repozytoriów studentów">Poprawka ze źródła</a>
     <a class="przycisk" href="{% url 'panel:przydzial_edycja' przydzial.pk %}">Terminy</a>
+    <a class="przycisk" href="{% url 'panel:przydzial_kopiuj' przydzial.pk %}" title="Ten sam zestaw dla kolejnych grup, z ich terminami">Kopiuj do innych grup</a>
   </div>
 </div>
 
@@ -46,23 +52,31 @@
 </div>
 
 <div class="naglowek" style="margin-bottom:10px">
-  <div class="paski">
-    <a class="znacznik {% if not filtr %}fiolet{% else %}szary{% endif %}" href="?">wszyscy {{ wszystkich }}</a>
-    {% for kolor, etykieta, n in przydzial.paski %}<a class="znacznik {{ kolor }}" href="?kolor={{ kolor }}">{{ etykieta }} {{ n }}</a>{% endfor %}
-    {% if przydzial.problemy %}<a class="znacznik czerwony" href="?kolor=problemy">problemy {{ przydzial.problemy }}</a>{% endif %}
-    {% if przydzial.testy %}<a class="znacznik czerwony" href="?kolor=testy" title="studenci, którzy zmienili pliki testów">zmienione testy {{ przydzial.testy }}</a>{% endif %}
+  {% if do_wyslania %}
+  <form id="wysylka" method="post" action="{% url 'panel:przydzial_wyslij_oceny' przydzial.pk %}" class="w-linii" style="order:2"
+        data-potwierdz="Wysłać oceny zaznaczonym studentom? Każdy dostanie komentarz z oceną w pull requeście, który zostanie zamknięty.">{% csrf_token %}
+    <button type="submit" class="glowny" data-czekaj="Wysyłam">Wyślij oceny zaznaczonym</button>
+  </form>
+  {% endif %}
+  <div class="liczniki">
+    <a class="licznik{% if not filtr %} aktywny{% endif %}" href="?"><b>{{ wszystkich }}</b> wszyscy</a>
+    {% if przydzial.do_oceny %}<a class="licznik{% if filtr == 'do_oceny' %} aktywny{% endif %}" href="?stan=do_oceny" title="oddane prace bez wysłanej oceny"><b>{{ przydzial.do_oceny }}</b> do oceny</a>{% endif %}
+    {% for s, n in przydzial.paski %}<a class="licznik{% if filtr == s.klucz %} aktywny{% endif %}" href="?stan={{ s.klucz }}" title="{{ s.opis }}"><i class="dioda {{ s.dioda }}" aria-hidden="true"></i><b>{{ n }}</b> {{ s.etykieta }}</a>{% endfor %}
+    {% if przydzial.testy %}<a class="licznik alarm{% if filtr == 'testy' %} aktywny{% endif %}" href="?stan=testy" title="studenci, którzy zmienili pliki testów"><b>{{ przydzial.testy }}</b> zmienione testy</a>{% endif %}
   </div>
 </div>
 
 <div class="karta przewijanie">
   <table class="tabela">
     <tr>
-      <th>Student</th><th>Konto</th><th>Stan terminu</th><th>Ostatnie wypchnięcie</th>
+      <th>{% if do_wyslania %}<input type="checkbox" data-zaznacz-wszystkie="zgl" title="zaznacz wszystkie oceny gotowe do wysłania">{% endif %}</th>
+      <th>Student</th><th>Konto</th><th>Stan pracy</th><th>Ostatnie wypchnięcie</th>
       <th>Ocena automatyczna</th>
       <th class="liczba">Mnożnik</th><th class="liczba">Ocena</th><th>GitHub</th>
     </tr>
     {% for z in zgloszenia %}
     <tr class="klik" data-href="{% url 'panel:zgloszenie' z.pk %}">
+      <td>{% if z.do_wyslania %}<input type="checkbox" name="zgl" value="{{ z.pk }}" form="wysylka" title="zaznacz do wysłania oceny">{% endif %}</td>
       <td>
         <a href="{% url 'panel:zgloszenie' z.pk %}">{% if z.student.imie_nazwisko %}{{ z.student.imie_nazwisko }}{% else %}<span class="slabe">bez nazwiska</span>{% endif %}</a>
         {% if not z.student.imie_nazwisko and z.student.kandydat_readme %}<div class="male"><span class="slabe">README:</span> {{ z.student.kandydat_readme }}?</div>{% endif %}
@@ -78,15 +92,15 @@
         {% elif e.zatwierdzona %}<span class="znacznik szary">zatwierdzona{% if e.automatycznie %} automatycznie{% endif %}</span>
         {% elif e.sporna %}<span class="znacznik zolty" title="wymaga decyzji">do decyzji {{ e.suma|floatformat:"-2" }}</span>
         {% else %}<span class="znacznik zielony" title="modele zgodne">zgodna {{ e.suma|floatformat:"-2" }}</span>{% endif %}
-        {% if e.sha != z.sha_oceniany and not e.w_toku %}<div class="male slabe">nieaktualna</div>{% endif %}
+        {% if z.ocena_nieaktualna %}<div class="male slabe" title="student zmienił oceniany stan albo zmieniono zadania lub modele; kliknij Oceń automatycznie">nieaktualna</div>{% endif %}
       {% else %}<span class="slabe male">brak</span>{% endif %}{% endwith %}</td>
       <td class="liczba">{% if z.mnoznik is not None %}<strong>{{ z.mnoznik|floatformat:"-2" }}</strong>{% elif z.sugerowany_mnoznik is not None %}<span class="slabe" title="sugestia">{{ z.sugerowany_mnoznik|floatformat:"-2" }}?</span>{% endif %}</td>
       <td class="liczba">{% if z.pr_zamkniety %}<strong>{{ z.wynik|floatformat:"-2" }}</strong>{% else %}<span class="slabe">-</span>{% endif %}</td>
-      <td class="male">{% if z.url_repo %}<a href="{{ z.url_repo }}" target="_blank" rel="noopener">repo</a>{% endif %}
-        {% if z.url_pr %} · <a href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">zmiany</a>{% endif %}</td>
+      <td class="male">{% if przydzial.w_poligonie %}<span class="slabe">fikcyjne</span>{% else %}{% if z.url_repo %}<a href="{{ z.url_repo }}" target="_blank" rel="noopener">repo</a>{% endif %}
+        {% if z.url_pr %} · <a href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">zmiany</a>{% endif %}{% endif %}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="9" class="puste">{% if filtr %}Brak zgłoszeń w tym filtrze.{% else %}Nikt jeszcze nie zaakceptował zestawu. Wyślij studentom link.{% endif %}</td></tr>
+    <tr><td colspan="10" class="puste">{% if filtr %}Brak zgłoszeń w tym filtrze.{% else %}Nikt jeszcze nie zaakceptował zestawu. Wyślij studentom link.{% endif %}</td></tr>
     {% endfor %}
   </table>
 </div>

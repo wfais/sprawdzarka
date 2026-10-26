@@ -1,7 +1,7 @@
 {% extends "kurs/panel/baza.html" %}
 {% block tytul %}{{ tytul }}{% endblock %}
 {% block tresc %}
-<div class="naglowek"><div><h1>{{ tytul }}</h1></div></div>
+<div class="naglowek"><div><h1>{{ tytul }}</h1>{% if opis %}<p class="podtytul">{{ opis }}</p>{% endif %}</div></div>
 <div class="karta" style="max-width:720px">
   <form method="post" class="formularz" {% if pliki %}enctype="multipart/form-data"{% endif %}>{% csrf_token %}
     {{ formularz.as_div }}
@@ -12,4 +12,15 @@
     </div>
   </form>
 </div>
+{% if usun_url %}
+<div class="karta strefa-usuwania" style="max-width:720px">
+  <h2>Usuwanie</h2>
+  {% if usun_blokada %}
+  <p class="drugie">{{ usun_blokada }}</p>
+  {% else %}
+  <p class="drugie">{{ usun_opis }} Przed usunięciem trzeba będzie wpisać nazwę.</p>
+  <a class="przycisk niebezpieczny" href="{{ usun_url }}">Usuń</a>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

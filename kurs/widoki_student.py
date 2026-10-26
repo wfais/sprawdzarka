@@ -5,12 +5,13 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import login
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from . import uslugi
+from . import logowanie as dostep, uslugi
 from .forms import FormularzAkceptacji
 from .github import klient as gh
 from .models import Przydzial, Student, Zgloszenie
@@ -34,9 +35,12 @@ def logowanie(request):
         nastepny = "/"
     if not settings.GITHUB_APP_CLIENT_ID:
         return _blad(request, "Logowanie przez GitHub nie jest jeszcze skonfigurowane.", status=503)
+    if inny := dostep.adres_pod_publicznym_hostem(request):
+        return redirect(inny)
     stan = secrets.token_urlsafe(16)
     request.session["gh_stan"] = stan
     request.session["gh_nastepny"] = nastepny
+    request.session["gh_cel"] = "student"
     return redirect(gh.adres_autoryzacji(_adres_powrotu(), stan))
 
 
@@ -53,8 +57,22 @@ def powrot(request):
         log.warning("Logowanie studenta nieudane: %s", blad)
         return _blad(request, "Nie udało się zalogować przez GitHub. Spróbuj ponownie za chwilę.", status=502)
     nastepny = request.session.pop("gh_nastepny", "/")
+    if request.session.pop("gh_cel", "student") == "panel":
+        return _zaloguj_prowadzacego(request, dane, nastepny)
     request.session.cycle_key()
     request.session[SESJA_UZYTKOWNIKA] = {"id": dane["id"], "login": dane["login"], "nazwa": dane.get("name") or ""}
+    return redirect(nastepny)
+
+
+def _zaloguj_prowadzacego(request, dane, nastepny):
+    """Powrot z GitHuba po logowaniu do panelu: tylko konta z listy PANEL_KONTA_GITHUB."""
+    try:
+        uzytkownik = dostep.prowadzacy_z_githuba(dane)
+    except dostep.BladLogowania as blad:
+        log.warning("Odmowa dostepu do panelu dla @%s: %s", dane.get("login"), blad)
+        messages.error(request, str(blad))
+        return redirect("panel:logowanie")
+    login(request, uzytkownik, backend="django.contrib.auth.backends.ModelBackend")
     return redirect(nastepny)
 
 
@@ -67,7 +85,12 @@ def wyloguj(request):
 
 
 def zestaw(request, token):
-    przydzial = get_object_or_404(Przydzial.objects.select_related("zestaw", "grupa"), token=token)
+    przydzial = get_object_or_404(Przydzial.objects.select_related("zestaw__kurs__rok", "grupa"), token=token)
+    if przydzial.w_poligonie:
+        return render(request, "kurs/student/niedostepny.html", {"przydzial": przydzial, "poligon": True})
+    if not przydzial.opublikowany:
+        # Link mozna rozeslac wczesniej: do chwili publikacji pokazuje tylko termin udostepnienia
+        return render(request, "kurs/student/niedostepny.html", {"przydzial": przydzial})
     uzytkownik = request.session.get(SESJA_UZYTKOWNIKA)
     if not uzytkownik:
         return redirect(f"{reverse('student:logowanie')}?next={request.path}")
@@ -111,4 +134,6 @@ def zestaw(request, token):
         "galaz": settings.SPRAWDZARKA_GALAZ,
         "utknelo": bool(zgloszenie and zgloszenie.status == Zgloszenie.Status.TWORZENIE
                         and zgloszenie.utworzono < timezone.now() - timedelta(minutes=1)),
+        "poprawki": list(zgloszenie.poprawki.select_related("poprawka").filter(
+            stan__in=["scalona", "do_scalenia"]).order_by("-poprawka__numer")) if zgloszenie else [],
     })

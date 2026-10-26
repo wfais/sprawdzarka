@@ -1,0 +1,8 @@
+<div class="wiersz-przydzialu">
+  <div class="glowa-wiersza">
+    <span><a class="nazwa" href="{% url 'panel:przydzial' p.pk %}">{{ p.zestaw.nazwa }}</a>{% if p.zestaw.kolokwium %} <span class="znacznik fiolet">kolokwium</span>{% endif %}</span>
+    {% include "kurs/panel/_stan_zestawu.html" %}
+  </div>
+  <div class="meta"><span>termin <b>{{ p.termin_miekki|date:"d.m H:i" }}</b></span><span>ostateczny <b>{{ p.termin_twardy|date:"d.m H:i" }}</b></span>{% if not p.otwarty %}<span>zamknięty dla zgłoszeń</span>{% endif %}</div>
+  {% include "kurs/panel/_paski.html" %}
+</div>

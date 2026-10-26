@@ -10,10 +10,10 @@
 </div>
 <div class="karta przewijanie">
   <table class="tabela">
-    <tr><th>Konto</th><th>Imię i nazwisko</th><th>Źródło</th><th>Kandydat z README</th><th class="liczba">Zestawy</th></tr>
+    <tr><th>Konto</th><th>Imię i nazwisko</th><th>Prace</th><th>Źródło</th><th>Kandydat z README</th></tr>
     {% for s in studenci %}
     <tr>
-      <td class="mono"><a href="https://github.com/{{ s.login }}" target="_blank" rel="noopener">{{ s.login }}</a></td>
+      <td class="mono">{% if s.fikcyjny %}<span title="konto fikcyjne z poligonu">{{ s.login }}</span>{% else %}<a href="https://github.com/{{ s.login }}" target="_blank" rel="noopener">{{ s.login }}</a>{% endif %}</td>
       <td>
         <form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski">{% csrf_token %}
           <input type="text" name="imie_nazwisko" value="{{ s.imie_nazwisko }}" style="width:220px" placeholder="nieustalone">
@@ -21,6 +21,7 @@
           <button class="maly" type="submit">Zapisz</button>
         </form>
       </td>
+      <td><div class="kafelki">{% for z in s.prace %}{% with st=z.stan_pracy %}<a class="kafelek" href="{% url 'panel:zgloszenie' z.pk %}" title="{{ z.przydzial.grupa.nazwa }}: {{ z.przydzial.zestaw.nazwa }} ({{ st.etykieta }})"><i class="dioda {{ st.dioda }}" aria-hidden="true"></i>{{ z.przydzial.zestaw.skrot }}</a>{% endwith %}{% empty %}<span class="slabe male">brak</span>{% endfor %}</div></td>
       <td class="male drugie">{{ s.get_zrodlo_nazwiska_display }}</td>
       <td>
         {% if s.kandydat_readme and not s.imie_nazwisko %}
@@ -32,7 +33,6 @@
         </form>
         {% endif %}
       </td>
-      <td class="liczba">{{ s.liczba }}</td>
     </tr>
     {% empty %}
     <tr><td colspan="5" class="puste">Brak studentów.</td></tr>

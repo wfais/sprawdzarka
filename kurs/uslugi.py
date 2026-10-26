@@ -1,11 +1,12 @@
 """Logika systemu: akceptacja zestawow, rejestr wypchniec, przeliczanie terminow, oceny, zerowanie."""
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timedelta
 from datetime import timezone as strefa
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Optional
+from typing import Optional, Sequence
 
 from django.conf import settings
 from django.db import IntegrityError, close_old_connections, transaction
@@ -19,7 +20,15 @@ from .models import Porownanie, Przydzial, Student, Wypchniecie, Zgloszenie
 
 log = logging.getLogger(__name__)
 
-BLEDY = (gh.BladGitHub, git.BladGit)
+
+class BladPoligonu(Exception):
+    """Operacja wymaga prawdziwego GitHuba, a dotyczy danych fikcyjnych z poligonu."""
+
+    def __init__(self, czego="ta operacja"):
+        super().__init__(f"to dane fikcyjne z poligonu, {czego} wymaga prawdziwego repozytorium na GitHubie")
+
+
+BLEDY = (gh.BladGitHub, git.BladGit, BladPoligonu)
 ZERO_SHA = terminy.ZERO_SHA
 
 TRESC_PR = (
@@ -37,17 +46,40 @@ def _ref_galezi():
     return f"refs/heads/{settings.SPRAWDZARKA_GALAZ}"
 
 
+# --- Poligon: dane fikcyjne bez GitHuba ---
+
+def _w_poligonie(obiekt) -> bool:
+    przydzial = obiekt if isinstance(obiekt, Przydzial) else obiekt.przydzial
+    return przydzial.zestaw.kurs.rok.poligon
+
+
+def sha_fikcyjny(tekst: str) -> str:
+    return hashlib.sha1(tekst.encode()).hexdigest()
+
+
+def nowe_repo_fikcyjne() -> int:
+    """Ujemne numery repozytoriow: nie koliduja z numerami z GitHuba."""
+    najmniejszy = Zgloszenie.objects.filter(repo_id__lt=0).order_by("repo_id").values_list("repo_id", flat=True).first()
+    return min(najmniejszy or 0, -10_000_000) - 1
+
+
 # --- Repozytorium startowe grupy ---
 
 def utworz_repo_startowe(przydzial: Przydzial) -> None:
     """Kopia repozytorium zrodlowego (bez historii) jako repozytorium startowe danej grupy."""
     if przydzial.repo_startowe and przydzial.sha_startowy:
         return
-    nazwa = f"{przydzial.przedrostek_repo}-start"
+    nazwa = f"{przydzial.przedrostek_repo}start"
+    if _w_poligonie(przydzial):
+        przydzial.repo_startowe = f"{settings.GITHUB_ORG}/{nazwa}"
+        przydzial.sha_startowy = sha_fikcyjny(przydzial.repo_startowe)
+        przydzial.save(update_fields=["repo_startowe", "sha_startowy"])
+        return
     dane, _ = gh.utworz_repo(nazwa, f"Stan startowy: {przydzial.zestaw.nazwa}, {przydzial.grupa.nazwa}")
     sha = git.migawka_startowa(
-        przydzial.zestaw.repo_zrodlowe, dane["full_name"],
+        przydzial.zrodlo, dane["full_name"],
         f"Stan startowy: {przydzial.zestaw.nazwa} ({przydzial.grupa.nazwa})",
+        z_actions=przydzial.zestaw.kopiuj_actions,
     )
     przydzial.repo_startowe = dane["full_name"]
     przydzial.sha_startowy = sha
@@ -57,7 +89,7 @@ def utworz_repo_startowe(przydzial: Przydzial) -> None:
 # --- Akceptacja zestawu przez studenta ---
 
 def nazwa_repo_studenta(przydzial: Przydzial, login: str, numer: int = 1) -> str:
-    nazwa = f"{przydzial.przedrostek_repo}-{login}".lower()
+    nazwa = f"{przydzial.przedrostek_repo}{login}".lower()
     if numer > 1:
         nazwa = f"{nazwa}-{numer}"
     return nazwa[:100]
@@ -127,6 +159,8 @@ def dokoncz_zgloszenie(zgloszenie: Zgloszenie) -> bool:
     """Kolejne kroki tworzenia repozytorium studenta. Kazdy krok jest zapisywany, wiec mozna je ponawiac."""
     if not _zajmij(zgloszenie):
         return False
+    if _w_poligonie(zgloszenie):
+        return _dokoncz_fikcyjne(zgloszenie)
     try:
         zgloszenie.refresh_from_db()
         przydzial = zgloszenie.przydzial
@@ -172,16 +206,45 @@ def dokoncz_zgloszenie(zgloszenie: Zgloszenie) -> bool:
         Zgloszenie.objects.filter(pk=zgloszenie.pk).update(w_toku_od=None)
 
 
+def _dokoncz_fikcyjne(zgloszenie: Zgloszenie) -> bool:
+    """Poligon: repozytorium studenta tylko w bazie (bez GitHuba)."""
+    zgloszenie.refresh_from_db()
+    if not zgloszenie.repo_id:
+        zgloszenie.repo_id = nowe_repo_fikcyjne()
+        zgloszenie.repo_nazwa = f"{settings.GITHUB_ORG}/{nazwa_repo_studenta(zgloszenie.przydzial, zgloszenie.student.login)}"
+    zgloszenie.sha_bazowy = zgloszenie.sha_poczatkowy = zgloszenie.sha_bazowy or sha_fikcyjny(zgloszenie.repo_nazwa)
+    zgloszenie.zaproszenie_wyslane = True
+    zgloszenie.pr_numer = zgloszenie.pr_numer or 1
+    zgloszenie.status = Zgloszenie.Status.GOTOWE
+    zgloszenie.blad_opis = ""
+    zgloszenie.w_toku_od = None
+    zgloszenie.save()
+    przelicz(zgloszenie)
+    return True
+
+
 # --- Rejestr wypchniec ---
 
-def zapisz_wypchniecie(repo_id, repo_nazwa, ref, sha_przed, sha_po, czas, autor, zrodlo) -> bool:
-    _, nowe = Wypchniecie.objects.get_or_create(
+def zapisz_wypchniecie(repo_id, repo_nazwa, ref, sha_przed, sha_po, czas, autor, zrodlo, autor_id=None) -> bool:
+    wpis, nowe = Wypchniecie.objects.get_or_create(
         repo_id=repo_id, ref=ref, sha_przed=sha_przed or ZERO_SHA, sha_po=sha_po or ZERO_SHA,
-        defaults={"repo_nazwa": repo_nazwa, "czas": czas, "autor": autor or "", "zrodlo": zrodlo},
+        defaults={"repo_nazwa": repo_nazwa, "czas": czas, "autor": autor or "", "autor_id": autor_id, "zrodlo": zrodlo},
     )
+    if not nowe and autor_id and not wpis.autor_id:
+        Wypchniecie.objects.filter(pk=wpis.pk).update(autor_id=autor_id)
+        nowe = True  # zmiana autora wplywa na przeliczenie
     if nowe:
         Zgloszenie.objects.filter(repo_id=repo_id).update(do_przeliczenia=True)
     return nowe
+
+
+def od_studenta(wypchniecie: Wypchniecie, student: Student) -> bool:
+    """Czy wypchniecie zrobil sam student. Wypchniecia prowadzacego (wlasciciela organizacji) sa pomijane."""
+    if wypchniecie.autor_id:
+        return wypchniecie.autor_id == student.github_id
+    if wypchniecie.autor:
+        return wypchniecie.autor.lower() == (student.login or "").lower()
+    return True  # autor nieznany: liczy sie jak wypchniecie studenta
 
 
 def obsluz_webhook_push(dane: dict) -> bool:
@@ -196,12 +259,13 @@ def obsluz_webhook_push(dane: dict) -> bool:
     return zapisz_wypchniecie(
         repo["id"], repo.get("full_name", ""), dane["ref"], dane.get("before"), dane.get("after"),
         czas, (dane.get("pusher") or {}).get("name", ""), Wypchniecie.Zrodlo.WEBHOOK,
+        autor_id=(dane.get("sender") or {}).get("id"),
     )
 
 
 def synchronizuj(zgloszenie: Zgloszenie) -> int:
     """Uzupelnia rejestr wypchniec z dziennika aktywnosci GitHub (gdyby powiadomienie nie dotarlo)."""
-    if not zgloszenie.repo_nazwa or not zgloszenie.repo_id:
+    if not zgloszenie.repo_nazwa or not zgloszenie.repo_id or _w_poligonie(zgloszenie):
         return 0
     nowe = 0
     for wpis in gh.aktywnosc(zgloszenie.repo_nazwa, _galaz()):
@@ -214,6 +278,7 @@ def synchronizuj(zgloszenie: Zgloszenie) -> int:
         nowe += zapisz_wypchniecie(
             zgloszenie.repo_id, zgloszenie.repo_nazwa, ref, wpis.get("before"), wpis.get("after"),
             czas, (wpis.get("actor") or {}).get("login", ""), Wypchniecie.Zrodlo.AKTYWNOSC,
+            autor_id=(wpis.get("actor") or {}).get("id"),
         )
     return nowe
 
@@ -243,33 +308,93 @@ def przelicz(zgloszenie: Zgloszenie) -> None:
     # Flaga zdejmowana przed obliczeniem: powiadomienie w trakcie ustawi ja ponownie
     Zgloszenie.objects.filter(pk=zgloszenie.pk).update(do_przeliczenia=False)
     try:
-        _przelicz(zgloszenie)
+        if _w_poligonie(zgloszenie):
+            _przelicz_poligonu(zgloszenie)
+        else:
+            _przelicz(zgloszenie)
     except Exception:
         Zgloszenie.objects.filter(pk=zgloszenie.pk).update(do_przeliczenia=True)
         raise
 
 
+def wypchniecia_zgloszenia(zgloszenie: Zgloszenie) -> tuple[list, list, list]:
+    """(wszystkie, studenta, obce) wypchniecia galezi glownej; utworzenie galezi przez aplikacje pomijane."""
+    student = zgloszenie.student
+    wszystkie = []
+    for p in Wypchniecie.objects.filter(repo_id=zgloszenie.repo_id, ref=_ref_galezi()).order_by("czas", "id"):
+        p.wlasne = od_studenta(p, student)
+        if not (p.sha_po == zgloszenie.sha_poczatkowy and not p.wlasne):
+            wszystkie.append(p)
+    pushe = [p for p in wszystkie if p.wlasne]
+    obce = [p for p in wszystkie if not p.wlasne and p.sha_po != ZERO_SHA]
+    return wszystkie, pushe, obce
+
+
 def _przelicz(zgloszenie: Zgloszenie) -> None:
-    pushe = list(
-        Wypchniecie.objects.filter(repo_id=zgloszenie.repo_id, ref=_ref_galezi()).order_by("czas", "id")
-    )
+    wszystkie, pushe, obce = wypchniecia_zgloszenia(zgloszenie)
     wzorce = zgloszenie.przydzial.zestaw.lista_wzorcow()
     niepewne = []
+    # Zmiany prowadzacego (poprawki stanu startowego, wypchniecia z innych kont) nie sa zmianami studenta
+    potrzebne_wersje = bool(obce) or len(zgloszenie.przydzial.stany_startowe) > 1
+    wersje_kodu: dict = {}
+    wczytane = []
 
     def kod_zmieniony(sha_od, sha_do):
         pliki = _porownaj_z_pamiecia(zgloszenie, sha_od, sha_do)
         if pliki is None:
             niepewne.append((sha_od, sha_do))
             return True
-        return any(terminy.pasuje_do_wzorcow(p, wzorce) for p in pliki)
+        pliki = [p for p in pliki if terminy.pasuje_do_wzorcow(p, wzorce)]
+        if pliki and potrzebne_wersje:
+            if not wczytane:
+                wersje_kodu.update(_wersje_prowadzacego(zgloszenie, obce, tylko_testy=False))
+                wczytane.append(True)
+            pliki = _bez_zmian_prowadzacego(zgloszenie, sha_do, pliki, wersje_kodu)
+        return bool(pliki)
 
     wynik = terminy.oblicz(
-        [terminy.Push(p.czas, p.sha_po) for p in pushe],
+        [terminy.Push(p.czas, p.sha_po, p.sha_przed, p.wlasne) for p in wszystkie],
         zgloszenie.sha_bazowy, zgloszenie.sha_poczatkowy,
         zgloszenie.termin_miekki, zgloszenie.termin_twardy, timezone.now(),
         kod_zmieniony, settings.SPRAWDZARKA_MNOZNIK_SPOZNIENIA,
     )
+    _zapisz_wynik(zgloszenie, wynik, pushe, obce, niepewne)
+    _sprawdz_testy(zgloszenie, pushe, obce)
+    _sprawdz_readme(zgloszenie)
+
+
+def _przelicz_poligonu(zgloszenie: Zgloszenie) -> None:
+    """Poligon: terminy liczone wylacznie z bazy. Zmienione pliki wypchniec sa w pamieci porownan."""
+    wszystkie, pushe, obce = wypchniecia_zgloszenia(zgloszenie)
+    wzorce = zgloszenie.przydzial.zestaw.lista_wzorcow()
+    lancuch = [zgloszenie.sha_poczatkowy] + [p.sha_po for p in wszystkie]
+    porownania = {(w.sha_od, w.sha_do): w.pliki for w in Porownanie.objects.filter(repo_id=zgloszenie.repo_id)}
+    pliki_krokow = [porownania.get((p.sha_przed, p.sha_po)) for p in wszystkie]
+
+    def kod_zmieniony(sha_od, sha_do):
+        if sha_od not in lancuch or sha_do not in lancuch:
+            return True
+        od, do = lancuch.index(sha_od), lancuch.index(sha_do)
+        if od >= do:
+            return True
+        kroki = pliki_krokow[od:do]
+        if any(k is None for k in kroki):
+            return True
+        return any(terminy.pasuje_do_wzorcow(p, wzorce) for k in kroki for p in k)
+
+    wynik = terminy.oblicz(
+        [terminy.Push(p.czas, p.sha_po, p.sha_przed, p.wlasne) for p in wszystkie],
+        zgloszenie.sha_bazowy, zgloszenie.sha_poczatkowy,
+        zgloszenie.termin_miekki, zgloszenie.termin_twardy, timezone.now(),
+        kod_zmieniony, settings.SPRAWDZARKA_MNOZNIK_SPOZNIENIA,
+    )
+    _zapisz_wynik(zgloszenie, wynik, pushe, obce, [])
+
+
+def _zapisz_wynik(zgloszenie: Zgloszenie, wynik, pushe, obce, niepewne) -> None:
     opis = wynik.opis
+    if obce:
+        opis += f" Pominięto wypchnięcia z innych kont niż konto studenta: {len(obce)}."
     if niepewne:
         opis += " Uwaga: części historii nie udało się porównać (sprawdź ręcznie)."
     zgloszenie.stan_kolor = wynik.kolor
@@ -285,8 +410,6 @@ def _przelicz(zgloszenie: Zgloszenie) -> None:
         "stan_kolor", "stan_opis", "sugerowany_mnoznik", "sha_oceniany", "sha_teraz",
         "ostatnie_wypchniecie", "przeliczono",
     ])
-    _sprawdz_testy(zgloszenie, pushe)
-    _sprawdz_readme(zgloszenie)
 
 
 KATEGORIE_ZMIAN_TESTOW = ("zmienione", "usuniete", "dodane")
@@ -323,7 +446,69 @@ def _klasyfikuj_zmiany_testow(zgloszenie: Zgloszenie, sha: str, pliki: list) -> 
     return wynik
 
 
-def _sprawdz_testy(zgloszenie: Zgloszenie, pushe: list) -> None:
+def _wersje_prowadzacego(zgloszenie: Zgloszenie, obce: Sequence, tylko_testy: bool = True) -> dict:
+    """Wersje plikow pochodzace od prowadzacego: sciezka -> zbior skrotow zawartosci (None: plik usuniety).
+
+    Zrodla: kolejne stany startowe grupy (gdy byly poprawki) i wypchniecia z innych kont niz konto studenta.
+    Plik w takiej wersji nie jest zmiana studenta, nawet jesli rozni sie od biezacego stanu startowego.
+    """
+    wersje: dict = {}
+
+    def dodaj(sciezka, skrot):
+        if not tylko_testy or uruchamianie.nalezy_do_prowadzacego(sciezka):
+            wersje.setdefault(sciezka, set()).add(skrot)
+
+    przydzial = zgloszenie.przydzial
+    stany = przydzial.stany_startowe
+    if len(stany) > 1 and przydzial.repo_startowe:
+        poprzednie = None
+        for sha in stany:
+            try:
+                drzewo = gh.drzewo_blobow(przydzial.repo_startowe, sha)
+            except gh.BladGitHub as blad:
+                log.warning("Nie mozna odczytac stanu startowego %s: %s", sha, blad)
+                continue
+            for sciezka, skrot in drzewo.items():
+                dodaj(sciezka, skrot)
+            for sciezka in set(poprzednie or {}) - set(drzewo):
+                dodaj(sciezka, None)
+            poprzednie = drzewo
+    for p in obce:
+        if not p.sha_przed or p.sha_przed == ZERO_SHA:
+            continue
+        pliki = _porownaj_z_pamiecia(zgloszenie, p.sha_przed, p.sha_po)
+        pliki = [s for s in (pliki or []) if not tylko_testy or uruchamianie.nalezy_do_prowadzacego(s)]
+        if not pliki:
+            continue
+        try:
+            drzewo = gh.drzewo_blobow(zgloszenie.repo_nazwa, p.sha_po)
+        except gh.BladGitHub:
+            continue
+        for sciezka in pliki:
+            dodaj(sciezka, drzewo.get(sciezka))
+    return wersje
+
+
+def wersje_dla_oceny(zgloszenie: Zgloszenie) -> dict:
+    """Wersje plikow od prowadzacego dla oceny automatycznej (puste, gdy nie bylo poprawek ani obcych wypchniec)."""
+    _, _, obce = wypchniecia_zgloszenia(zgloszenie)
+    if not obce and len(zgloszenie.przydzial.stany_startowe) <= 1:
+        return {}
+    return _wersje_prowadzacego(zgloszenie, obce, tylko_testy=False)
+
+
+def _bez_zmian_prowadzacego(zgloszenie: Zgloszenie, sha: str, pliki: list, wersje: dict) -> list:
+    """Usuwa pliki, ktore w danym stanie maja wersje wprowadzona przez prowadzacego."""
+    if not any(s in wersje for s in pliki):
+        return pliki
+    try:
+        drzewo = gh.drzewo_blobow(zgloszenie.repo_nazwa, sha)
+    except gh.BladGitHub:
+        return pliki
+    return [s for s in pliki if not (s in wersje and drzewo.get(s) in wersje[s])]
+
+
+def _sprawdz_testy(zgloszenie: Zgloszenie, pushe: list, obce: Sequence = ()) -> None:
     """Znakowanie zgloszen, w ktorych student zmienil pliki testow prowadzacego (jak flaga w GitHub Classroom).
 
     Sprawdzany jest stan biezacy i oceniany oraz kazdy wczesniej wypchniety stan galezi glownej,
@@ -337,11 +522,14 @@ def _sprawdz_testy(zgloszenie: Zgloszenie, pushe: list) -> None:
     historia = [s for s in dict.fromkeys(p.sha_po for p in pushe) if s not in pomijane and s not in biezace]
     zmiany = {k: set() for k in KATEGORIE_ZMIAN_TESTOW}
     niepewne = False
+    wersje = (_wersje_prowadzacego(zgloszenie, obce)
+              if obce or len(zgloszenie.przydzial.stany_startowe) > 1 else {})
     for sha in biezace:
         pliki = _pliki_prowadzacego_zmienione(zgloszenie, sha)
         if pliki is None:
             niepewne = True
             continue
+        pliki = _bez_zmian_prowadzacego(zgloszenie, sha, pliki, wersje)
         for kategoria, sciezki in _klasyfikuj_zmiany_testow(zgloszenie, sha, pliki).items():
             zmiany[kategoria].update(sciezki)
     teraz = set().union(*zmiany.values())
@@ -351,7 +539,7 @@ def _sprawdz_testy(zgloszenie: Zgloszenie, pushe: list) -> None:
         if pliki is None:
             niepewne = True
             continue
-        wczesniej.update(pliki)
+        wczesniej.update(_bez_zmian_prowadzacego(zgloszenie, sha, pliki, wersje))
     wczesniej -= teraz
 
     dane = {k: sorted(v) for k, v in zmiany.items() if v}
@@ -415,9 +603,12 @@ def cykl_robota(pelny: bool) -> None:
     for zgloszenie in Zgloszenie.objects.filter(
         Q(w_toku_od__isnull=True) | Q(w_toku_od__lt=teraz - timedelta(minutes=3)),
         status=Zgloszenie.Status.TWORZENIE, utworzono__lt=teraz - timedelta(minutes=2),
-    )[:20]:
+    ).exclude(przydzial__zestaw__kurs__rok__poligon=True)[:20]:
         dokoncz_zgloszenie(zgloszenie)
-    zgloszenia = Zgloszenie.objects.filter(status=Zgloszenie.Status.GOTOWE).select_related("przydzial", "student")
+    # Lata zarchiwizowane sa zamrozone: robot ich nie synchronizuje ani nie przelicza
+    zgloszenia = (Zgloszenie.objects.filter(status=Zgloszenie.Status.GOTOWE)
+                  .exclude(przydzial__zestaw__kurs__rok__zarchiwizowany=True).exclude(przydzial__zestaw__kurs__rok__poligon=True)
+                  .select_related("przydzial", "student"))
     if pelny:
         # Synchronizacja i przeliczenie zestawow, ktorych termin ostateczny minal nie dawniej niz 30 dni temu
         zgloszenia = zgloszenia.filter(przydzial__termin_twardy__gte=teraz - timedelta(days=30), pr_zamkniety=False)
@@ -477,6 +668,12 @@ def zamknij_z_ocena(zgloszenie: Zgloszenie, punkty: Decimal, mnoznik: Decimal, k
     zgloszenie.save(update_fields=["punkty", "mnoznik", "komentarz_koncowy", "oceniono"])
     przypiete = False
     klucz = tresc_oceny(zgloszenie, punkty, mnoznik, komentarz, rozbicie)
+    if _w_poligonie(zgloszenie):
+        # Poligon: ocena zapisana tylko w bazie, tak jakby trafila do pull requestu
+        zgloszenie.tresc_oceny_wyslana = klucz
+        zgloszenie.pr_zamkniety = True
+        zgloszenie.save(update_fields=["tresc_oceny_wyslana", "pr_zamkniety"])
+        return False
     znacznik_recenzji = klucz + "\n<!-- recenzja wyslana -->"
     if zgloszenie.pr_numer and klucz != zgloszenie.tresc_oceny_wyslana:
         # Ta ocena nie zostala jeszcze wyslana (przy ponowieniu po bledzie nic nie dublujemy)
@@ -509,6 +706,8 @@ def zamknij_z_ocena(zgloszenie: Zgloszenie, punkty: Decimal, mnoznik: Decimal, k
 
 def ponow_zaproszenie(zgloszenie: Zgloszenie) -> None:
     """Ponowne zaproszenie (zaproszenia wygasaja po 7 dniach); dla wspolpracownika nic nie zmienia."""
+    if _w_poligonie(zgloszenie):
+        raise BladPoligonu("zaproszenie")
     gh.zapros(zgloszenie.repo_nazwa, zgloszenie.student.login)
 
 
@@ -517,7 +716,7 @@ def ponow_zaproszenie(zgloszenie: Zgloszenie) -> None:
 def wyzeruj(zgloszenie: Zgloszenie, usun_repo: bool = False) -> list[str]:
     """Odlacza zgloszenie, aby student mogl zaakceptowac zestaw od nowa. Zwraca komunikaty."""
     komunikaty = []
-    if zgloszenie.repo_nazwa:
+    if zgloszenie.repo_nazwa and not _w_poligonie(zgloszenie):
         try:
             gh.odbierz_dostep(zgloszenie.repo_nazwa, zgloszenie.student.login)
         except gh.BladGitHub as blad:

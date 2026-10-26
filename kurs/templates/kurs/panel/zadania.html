@@ -1,7 +1,7 @@
 {% extends "kurs/panel/baza.html" %}
 {% block tytul %}Zadania: {{ zestaw.nazwa }}{% endblock %}
 {% block tresc %}
-<div class="okruszki"><a href="{% url 'panel:zestaw' zestaw.pk %}">{{ zestaw.nazwa }}</a></div>
+{% include "kurs/panel/_okruszki.html" with kurs=zestaw.kurs zestaw=zestaw only %}
 <div class="naglowek"><div><h1>Zadania i kryteria</h1>
   <p class="podtytul">Katalog wiąże zadanie z plikami i testami (np. <code>ZADANIE1/</code>). Testy z katalogu zadania liczą się do jego wyniku.
   Zadania z interfejsem graficznym oznacz jako „tylko modele” albo „tylko ręcznie”.</p></div></div>
@@ -12,7 +12,8 @@
   <table class="tabela">
     <tr><th>Kol.</th><th>Oznaczenie</th><th>Katalog</th><th>Punkty</th><th>Sposób oceny</th><th style="width:38%">Kryteria</th><th>Usuń</th></tr>
     {% for f in formularze %}
-    <tr>
+    {% if not f.instance.pk %}<tr class="nowy-naglowek"><td colspan="7">Nowe zadanie: wypełnij tylko, jeśli chcesz dopisać kolejne. Pusty wiersz jest pomijany.</td></tr>{% endif %}
+    <tr{% if not f.instance.pk %} class="nowy-wiersz"{% endif %}>
       <td>{{ f.id }}{{ f.kolejnosc }}</td>
       <td>{{ f.kod }}{{ f.kod.errors }}</td>
       <td>{{ f.katalog }}</td>
@@ -28,7 +29,7 @@
   <div class="przyciski" style="margin-top:12px">
     <button class="glowny" type="submit">Zapisz zadania</button>
     <a class="przycisk" href="{% url 'panel:zestaw' zestaw.pk %}">Anuluj</a>
-    <span class="male slabe">Puste wiersze są pomijane. Po zapisie pojawią się kolejne puste wiersze.</span>
+    <span class="male slabe">Żeby usunąć zadanie, zaznacz „Usuń” i zapisz.</span>
   </div>
 </form>
 {% endblock %}

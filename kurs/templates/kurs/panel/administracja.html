@@ -1,0 +1,45 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Administracja{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Administracja</h1>
+  <p class="podtytul">Rzadko używane narzędzia: dostęp do panelu, poligon do prób i bezpośredni dostęp do danych.</p></div></div>
+<div class="siatka-polowy">
+  <section class="karta">
+    <h2>Dostęp do panelu</h2>
+    {% if konta_github %}
+    <p class="drugie">Konta GitHub, które mogą się zalogować{% if not github_wlaczony %} (brak GITHUB_APP_CLIENT_ID, logowanie nie zadziała){% endif %}:</p>
+    <ul class="lista-kont">{% for k, p in konta_github %}<li><code>@{{ k }}</code>
+      {% if p and p.ostatnie_logowanie %}<span class="slabe">ostatnio {{ p.ostatnie_logowanie|date:"j.m.Y H:i" }}</span>
+      {% else %}<span class="slabe">jeszcze się nie logowało</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="drugie">Logowanie przez GitHub jest wyłączone: brak kont w <code>PANEL_KONTA_GITHUB</code>.</p>
+    {% endif %}
+    <p class="drugie">Logowanie hasłem: <strong>{{ haslo|yesno:"włączone,wyłączone" }}</strong>{% if haslo %}, wstrzymywane na
+      {{ blokada_minut }} minut po {{ limit_prob }} nieudanych próbach{% endif %}.
+      Nieudane próby w ostatniej dobie: {{ nieudane }}.</p>
+    <p class="slabe">Zmiany w pliku <code>.env</code> (<code>PANEL_KONTA_GITHUB</code>, <code>PANEL_LOGOWANIE_HASLEM</code>) działają po ponownym uruchomieniu.</p>
+  </section>
+  <section class="karta karta-poligonu">
+    <h2>Poligon</h2>
+    {% if lata_poligonu %}
+    <p class="drugie">Fikcyjne dane do prób, bez połączenia z GitHubem:</p>
+    <ul>{% for r in lata_poligonu %}<li><a href="{% url 'panel:rok' r.pk %}">{{ r.pelna_nazwa }}</a>:
+      {% for k in r.kursy.all %}<a href="{% url 'panel:kurs' k.pk %}">{{ k.nazwa }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</li>{% endfor %}</ul>
+    <a class="przycisk niebezpieczny" href="{% url 'panel:poligon_usun' %}">Usuń poligon</a>
+    {% else %}
+    <p class="drugie">Fikcyjny rok na UJ z przedmiotami Język Python i Język C++: grupy, kilkadziesiąt osób, prace we wszystkich
+      stanach, wypchnięcia i oceny. Prawdziwych danych nie zmienia i nie łączy się z GitHubem, więc można go
+      utworzyć także przy prawdziwych danych. Usuniesz go w całości jednym przyciskiem.</p>
+    <form method="post" action="{% url 'panel:poligon_utworz' %}">{% csrf_token %}
+      <button type="submit" data-czekaj="Tworzę poligon">Utwórz poligon</button></form>
+    {% endif %}
+  </section>
+  <section class="karta">
+    <h2>Surowe dane</h2>
+    <p class="drugie">Panel Django: bezpośredni podgląd i edycja wszystkich tabel. Bez zabezpieczeń panelu prowadzącego
+      (usuwanie bez wpisywania nazwy), więc tylko awaryjnie.</p>
+    {% if uzytkownik_admin %}<a class="przycisk" href="{% url 'admin:index' %}">Otwórz panel Django</a>
+    {% else %}<p class="slabe">Wymaga konta administratora.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -13,6 +13,8 @@ admin.site.index_title = "Dane systemu"
 urlpatterns = [
     path("", RedirectView.as_view(pattern_name="panel:pulpit", permanent=False)),
     path("zdrowie/", lambda request: HttpResponse("ok", content_type="text/plain")),
+    # Panel Django loguje przez strone panelu (GitHub, blokada prob)
+    path("admin/login/", RedirectView.as_view(pattern_name="panel:logowanie", query_string=True)),
     path("admin/", admin.site.urls),
     path("panel/", include("kurs.urls_panel")),
     path("github/webhook/", widoki_webhook.webhook, name="github_webhook"),

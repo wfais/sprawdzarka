@@ -2,15 +2,15 @@
 {% block naglowek_strony %}{% if ewaluacja and ewaluacja.w_toku %}<meta http-equiv="refresh" content="8">{% endif %}{% endblock %}
 {% block tytul %}{{ z.student }}{% endblock %}
 {% block tresc %}
-<div class="okruszki"><a href="{% url 'panel:przydzial' z.przydzial.pk %}">{{ z.przydzial.grupa.nazwa }}: {{ z.przydzial.zestaw.nazwa }}</a></div>
+{% include "kurs/panel/_okruszki.html" with kurs=z.przydzial.zestaw.kurs grupa=z.przydzial.grupa przydzial=z.przydzial only %}
 <div class="naglowek">
   <div>
     <h1>{% if z.student.imie_nazwisko %}{{ z.student.imie_nazwisko }}{% else %}@{{ z.student.login }}{% endif %}</h1>
-    <p class="podtytul">Konto <a href="{{ github }}/{{ z.student.login }}" target="_blank" rel="noopener">@{{ z.student.login }}</a>
-      {% if z.repo_nazwa %} · repozytorium <a class="mono" href="{{ z.url_repo }}" target="_blank" rel="noopener">{{ z.repo_nazwa }}</a>{% endif %}</p>
+    <p class="podtytul">Konto {% if z.student.fikcyjny %}@{{ z.student.login }}{% else %}<a href="{{ github }}/{{ z.student.login }}" target="_blank" rel="noopener">@{{ z.student.login }}</a>{% endif %}
+      {% if z.repo_nazwa %} · repozytorium {% if z.przydzial.w_poligonie %}<span class="mono">{{ z.repo_nazwa }}</span> <span class="znacznik zolty">fikcyjne</span>{% else %}<a class="mono" href="{{ z.url_repo }}" target="_blank" rel="noopener">{{ z.repo_nazwa }}</a>{% endif %}{% endif %}</p>
   </div>
   <div class="przyciski">
-    {% if z.url_pr %}<a class="przycisk glowny" href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">Przeglądaj kod i komentuj</a>{% endif %}
+    {% if z.url_pr and not z.przydzial.w_poligonie %}<a class="przycisk glowny" href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">Przeglądaj kod i komentuj</a>{% endif %}
     {% if z.status == Status.GOTOWE %}
     <form method="post" action="{% url 'panel:zgloszenie_odswiez' z.pk %}" class="w-linii">{% csrf_token %}
       <button type="submit" data-czekaj="Odświeżam">Odśwież</button>
@@ -113,7 +113,7 @@
         {% for w in wypchniecia %}
         <tr><td>{{ w.czas|date:"d.m H:i:s" }}</td>
           <td class="mono">{% if w.ref != "refs/heads/main" %}{{ w.ref|cut:"refs/heads/" }} {% endif %}<a href="{{ z.url_repo }}/tree/{{ w.sha_po }}" target="_blank" rel="noopener">{{ w.sha_po|slice:":7" }}</a></td>
-          <td>{{ w.autor }}</td></tr>
+          <td>{{ w.autor }}{% if w.pominiete %} <span class="znacznik szary" title="nie liczy się do terminów: wypchnięcie z innego konta niż konto studenta">pominięte</span>{% endif %}</td></tr>
         {% endfor %}
       </table>
       {% else %}<p class="slabe">Brak zarejestrowanych wypchnięć.</p>{% endif %}

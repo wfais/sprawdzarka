@@ -1,4 +1,4 @@
-"""Model danych: grupy, zestawy, przydzialy zestawow do grup, studenci i ich zgloszenia."""
+"""Model danych: uczelnie, lata akademickie, przedmioty (kursy), grupy, zestawy, przydzialy zestawow do grup, studenci i zgloszenia."""
 import re
 import secrets
 from decimal import ROUND_HALF_UP, Decimal
@@ -8,35 +8,141 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
+
+from . import stany
 
 
 def nowy_token():
     return secrets.token_urlsafe(12)
 
 
-class Grupa(models.Model):
-    nazwa = models.CharField("nazwa", max_length=100)
+class Uczelnia(models.Model):
+    nazwa = models.CharField("nazwa", max_length=150)
     skrot = models.SlugField(
         "skrót", max_length=20, unique=True,
-        help_text="Krótki identyfikator, np. g4. Trafia do nazw repozytoriów.",
+        help_text="Np. uj, ans. Trafia do domyślnych nazw repozytoriów.",
     )
+    kolejnosc = models.PositiveSmallIntegerField("kolejność", default=0)
+
+    class Meta:
+        ordering = ["kolejnosc", "nazwa"]
+        verbose_name = "uczelnia"
+        verbose_name_plural = "uczelnie"
+
+    def __str__(self):
+        return self.nazwa
+
+
+def skrot_roku(nazwa: str) -> str:
+    """2026/2027 daje 2627."""
+    lata = re.findall(r"\d{4}", nazwa or "")
+    if len(lata) >= 2:
+        return lata[0][-2:] + lata[1][-2:]
+    return re.sub(r"[^a-z0-9-]+", "-", (nazwa or "").lower()).strip("-")[:20]
+
+
+class Rok(models.Model):
+    """Rok akademicki na uczelni: obejmuje przedmioty prowadzone w tym roku."""
+
+    uczelnia = models.ForeignKey(Uczelnia, on_delete=models.PROTECT, related_name="lata", verbose_name="uczelnia")
+    nazwa = models.CharField("rok akademicki", max_length=20, help_text="Np. 2026/2027.")
+    skrot = models.SlugField("skrót", max_length=20, blank=True,
+                             help_text="Np. 2627. Puste: utworzony z nazwy. Trafia do domyślnych nazw repozytoriów.")
+    ukryty = models.BooleanField("ukryty", default=False, help_text="Ukryty rok nie pokazuje się na pulpicie.")
+    zarchiwizowany = models.BooleanField("zarchiwizowany", default=False)
+    zarchiwizowano = models.DateTimeField(null=True, blank=True)
+    # Poligon: dane fikcyjne do prob, bez polaczenia z GitHubem
+    poligon = models.BooleanField("poligon", default=False, editable=False)
+
+    class Meta:
+        ordering = ["uczelnia__kolejnosc", "uczelnia__nazwa", "poligon", "-nazwa"]
+        verbose_name = "rok akademicki"
+        verbose_name_plural = "lata akademickie"
+        constraints = [models.UniqueConstraint(fields=["uczelnia", "skrot"], name="unikalny_rok_uczelni")]
+
+    def __str__(self):
+        return f"{self.nazwa} ({self.uczelnia.skrot.upper()})"
+
+    def save(self, *args, **kwargs):
+        if not self.skrot:
+            self.skrot = skrot_roku(self.nazwa)
+        super().save(*args, **kwargs)
+
+    @property
+    def pelna_nazwa(self):
+        return f"{self.uczelnia.skrot.upper()} · {self.nazwa}"
+
+
+class Kurs(models.Model):
+    """Przedmiot prowadzony w danym roku akademickim, np. Język Python w 2026/2027 na UJ."""
+
+    rok = models.ForeignKey(Rok, on_delete=models.PROTECT, related_name="kursy", verbose_name="rok akademicki")
+    nazwa = models.CharField("nazwa", max_length=150, help_text="Np. Język Python.")
+    skrot = models.SlugField("skrót", max_length=20, help_text="Np. py, cpp. Trafia do domyślnych nazw repozytoriów.")
+    kod = models.CharField("identyfikator przedmiotu", max_length=60, blank=True, help_text="Np. WFAIS.IF-X204.0.")
     opis = models.CharField("opis", max_length=200, blank=True)
+    ukryty = models.BooleanField("ukryty", default=False,
+                                 help_text="Ukryty przedmiot nie pokazuje się na pulpicie, np. po zakończonym semestrze.")
+
+    class Meta:
+        ordering = ["rok__uczelnia__kolejnosc", "rok__uczelnia__nazwa", "rok__poligon", "-rok__nazwa", "nazwa"]
+        verbose_name = "przedmiot"
+        verbose_name_plural = "przedmioty"
+        constraints = [models.UniqueConstraint(fields=["rok", "skrot"], name="unikalny_kurs_roku")]
+
+    def __str__(self):
+        return f"{self.nazwa} {self.rok.nazwa}"
+
+    @property
+    def uczelnia(self):
+        return self.rok.uczelnia
+
+    @property
+    def zarchiwizowany(self) -> bool:
+        return self.rok.zarchiwizowany
+
+    @property
+    def poligon(self) -> bool:
+        return self.rok.poligon
+
+    @property
+    def pelna_nazwa(self):
+        return f"{self.rok.uczelnia.skrot.upper()} · {self.rok.nazwa} · {self.nazwa}"
+
+
+class Grupa(models.Model):
+    kurs = models.ForeignKey(Kurs, on_delete=models.PROTECT, related_name="grupy", verbose_name="przedmiot")
+    nazwa = models.CharField("nazwa", max_length=100, help_text="Np. Grupa nr 3.")
+    skrot = models.SlugField(
+        "skrót", max_length=20,
+        help_text="Krótki identyfikator, np. g3. Trafia do domyślnych nazw repozytoriów.",
+    )
+    opis = models.CharField("zajęcia", max_length=200, blank=True,
+                            help_text="Dowolny opis, np. poniedziałek 10:10 - 11:40, sala G-1-03.")
     aktywna = models.BooleanField("aktywna", default=True)
 
     class Meta:
         ordering = ["nazwa"]
         verbose_name = "grupa"
         verbose_name_plural = "grupy"
+        constraints = [models.UniqueConstraint(fields=["kurs", "skrot"], name="unikalna_grupa_kursu")]
 
     def __str__(self):
         return self.nazwa
 
 
 class Zestaw(models.Model):
+    class Rodzaj(models.TextChoices):
+        ZESTAW = "zestaw", "zestaw zadań"
+        KOLOKWIUM = "kolokwium", "kolokwium"
+
+    kurs = models.ForeignKey(Kurs, on_delete=models.PROTECT, related_name="zestawy", verbose_name="przedmiot")
+    rodzaj = models.CharField("rodzaj", max_length=20, choices=Rodzaj.choices, default=Rodzaj.ZESTAW)
     nazwa = models.CharField("nazwa", max_length=100)
     skrot = models.SlugField(
-        "skrót", max_length=20, unique=True,
-        help_text="Krótki identyfikator, np. z03. Trafia do nazw repozytoriów.",
+        "skrót", max_length=20,
+        help_text="Krótki identyfikator, np. z03. Trafia do domyślnych nazw repozytoriów.",
     )
     repo_zrodlowe = models.CharField(
         "repozytorium źródłowe", max_length=200,
@@ -61,10 +167,12 @@ class Zestaw(models.Model):
         "modele oceniające", max_length=300, blank=True,
         help_text="Identyfikatory modeli oddzielone przecinkami. Puste: wszystkie skonfigurowane.",
     )
-    auto_zamykanie = models.BooleanField(
-        "zamykaj automatycznie zgodne oceny", default=False,
-        help_text="Gdy modele są zgodne i nic nie jest podejrzane, ocena trafia do studenta bez Twojego udziału "
-                  "(z sugerowanym mnożnikiem terminu). Sporne prace zawsze czekają na Ciebie.",
+    kopiuj_actions = models.BooleanField(
+        "kopiuj konfigurację GitHub Actions", default=False,
+        help_text="Zaznacz tylko, gdy w zadaniach studenci mają korzystać z GitHub Actions (np. okresowe zbieranie "
+                  "danych). Wtedy katalog .github/workflows z repozytorium źródłowego trafia do repozytoriów studentów, "
+                  "a aplikacja GitHub potrzebuje uprawnienia Workflows. Domyślnie ten katalog jest pomijany. "
+                  "Ustawienie działa przy tworzeniu repozytorium startowego grupy.",
     )
     utworzono = models.DateTimeField(auto_now_add=True)
 
@@ -72,6 +180,11 @@ class Zestaw(models.Model):
         ordering = ["skrot"]
         verbose_name = "zestaw"
         verbose_name_plural = "zestawy"
+        constraints = [models.UniqueConstraint(fields=["kurs", "skrot"], name="unikalny_zestaw_kursu")]
+
+    @property
+    def kolokwium(self):
+        return self.rodzaj == self.Rodzaj.KOLOKWIUM
 
     def __str__(self):
         return self.nazwa
@@ -86,13 +199,17 @@ class Przydzial(models.Model):
 
     zestaw = models.ForeignKey(Zestaw, on_delete=models.PROTECT, related_name="przydzialy", verbose_name="zestaw")
     grupa = models.ForeignKey(Grupa, on_delete=models.PROTECT, related_name="przydzialy", verbose_name="grupa")
+    publikacja = models.DateTimeField(
+        "publikacja", null=True, blank=True,
+        help_text="Od tej chwili link dla studentów działa. Puste albo data z przeszłości: od razu.",
+    )
     termin_miekki = models.DateTimeField("termin", help_text="Do tego terminu pełne punkty.")
     termin_twardy = models.DateTimeField(
         "termin ostateczny", help_text="Zmiany w kodzie po terminie i przed tą chwilą: sugerowana kara.",
     )
     przedrostek_repo = models.SlugField(
         "przedrostek repozytoriów", max_length=60, unique=True,
-        help_text="Repozytoria studentów: przedrostek-login, np. py-z03-g4-jkowalski.",
+        help_text="Nazwy repozytoriów: przedrostek + login, np. przedrostek py-z03-g4- daje py-z03-g4-jkowalski.",
     )
     token = models.CharField(max_length=40, unique=True, default=nowy_token, editable=False)
     otwarty = models.BooleanField("przyjmuje zgłoszenia", default=True)
@@ -100,8 +217,16 @@ class Przydzial(models.Model):
         "oceniaj automatycznie po terminie ostatecznym", default=False,
         help_text="Po terminie ostatecznym robot sam uruchomi testy i ocenę modelami dla wszystkich zgłoszeń.",
     )
+    repo_zrodlowe = models.CharField(
+        "inne repozytorium źródłowe", max_length=200, blank=True,
+        help_text="Tylko gdy ta grupa ma dostać inne repozytorium niż zestaw, np. wfais/python-zestaw3-wersja-b. "
+                  "Puste: repozytorium zestawu.",
+    )
     repo_startowe = models.CharField("repozytorium startowe", max_length=200, blank=True)
     sha_startowy = models.CharField(max_length=40, blank=True)
+    # Kolejne stany startowe (pierwszy i po kazdej poprawce prowadzacego); pliki w tych wersjach
+    # nie sa traktowane jako zmiany studenta
+    historia_startowa = models.JSONField(default=list, blank=True)
     utworzono = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -116,6 +241,17 @@ class Przydzial(models.Model):
     def clean(self):
         if self.termin_miekki and self.termin_twardy and self.termin_twardy < self.termin_miekki:
             raise ValidationError({"termin_twardy": "Termin ostateczny nie może być wcześniejszy niż termin."})
+        if (self.publikacja and self.termin_miekki and self.publikacja > timezone.now()
+                and self.publikacja > self.termin_miekki):
+            raise ValidationError({"publikacja": "Publikacja nie może być późniejsza niż termin."})
+
+    @property
+    def w_poligonie(self) -> bool:
+        return self.zestaw.kurs.rok.poligon
+
+    @property
+    def opublikowany(self) -> bool:
+        return self.publikacja is None or self.publikacja <= timezone.now()
 
     @property
     def link_akceptacji(self):
@@ -124,6 +260,24 @@ class Przydzial(models.Model):
     @property
     def url_repo_startowego(self):
         return f"{settings.GITHUB_URL}/{self.repo_startowe}" if self.repo_startowe else ""
+
+    @property
+    def zrodlo(self) -> str:
+        """Repozytorium zrodlowe tej grupy: wlasne albo zestawu."""
+        return self.repo_zrodlowe or self.zestaw.repo_zrodlowe
+
+    @staticmethod
+    def domyslny_przedrostek(zestaw, grupa) -> str:
+        """Np. uj-py2627-z03-g3- (uczelnia, przedmiot z rokiem, zestaw, grupa)."""
+        kurs = zestaw.kurs
+        return f"{kurs.rok.uczelnia.skrot}-{kurs.skrot}{kurs.rok.skrot}-{zestaw.skrot}-{grupa.skrot}-".lower()
+
+    @property
+    def stany_startowe(self) -> list[str]:
+        historia = list(self.historia_startowa or [])
+        if self.sha_startowy and self.sha_startowy not in historia:
+            historia.append(self.sha_startowy)
+        return historia
 
 
 class Student(models.Model):
@@ -151,6 +305,11 @@ class Student(models.Model):
     @property
     def wyswietlana_nazwa(self):
         return self.imie_nazwisko or f"@{self.login}"
+
+    @property
+    def fikcyjny(self) -> bool:
+        """Konto z poligonu (ujemny numer), nie istnieje na GitHubie."""
+        return self.github_id < 0
 
     @property
     def klucz_sortowania(self):
@@ -256,6 +415,15 @@ class Zgloszenie(models.Model):
         return bool(self.wyjatek_termin_miekki or self.wyjatek_termin_twardy)
 
     @property
+    def stan_pracy(self):
+        """Stan do wyswietlenia dioda (otwarte, w terminie, przeterminowane, po terminie, nie oddano...)."""
+        return stany.praca(self.status, self.stan_kolor, self.sugerowany_mnoznik, self.termin_miekki, timezone.now())
+
+    @property
+    def zmiany_po_terminie(self) -> bool:
+        return self.status == self.Status.GOTOWE and self.stan_kolor == self.Kolor.POMARANCZOWY
+
+    @property
     def url_repo(self):
         return f"{settings.GITHUB_URL}/{self.repo_nazwa}" if self.repo_nazwa else ""
 
@@ -312,6 +480,8 @@ class Wypchniecie(models.Model):
     sha_po = models.CharField(max_length=40)
     czas = models.DateTimeField("czas wypchnięcia")
     autor = models.CharField(max_length=100, blank=True)
+    # Staly numer konta GitHub wypychajacego (login moze sie zmienic)
+    autor_id = models.BigIntegerField(null=True, blank=True)
     zrodlo = models.CharField(max_length=20, choices=Zrodlo.choices)
     zarejestrowano = models.DateTimeField(auto_now_add=True)
 
@@ -344,6 +514,7 @@ class Zadanie(models.Model):
 
     class Tryb(models.TextChoices):
         TESTY_I_MODELE = "testy_modele", "testy i modele"
+        TESTY = "testy", "tylko testy"
         MODELE = "modele", "tylko modele (np. GUI, gry)"
         RECZNIE = "recznie", "tylko ręcznie"
 
@@ -367,6 +538,8 @@ class Zadanie(models.Model):
     def __str__(self):
         return f"{self.zestaw.skrot}/{self.kod}"
 
+    TRYBY_Z_TESTAMI = (Tryb.TESTY_I_MODELE, Tryb.TESTY)
+
     def obejmuje(self, sciezka: str) -> bool:
         katalog = self.katalog.strip().strip("/")
         return not katalog or sciezka == katalog or sciezka.startswith(katalog + "/")
@@ -384,6 +557,8 @@ class Ewaluacja(models.Model):
 
     zgloszenie = models.ForeignKey(Zgloszenie, on_delete=models.CASCADE, related_name="ewaluacje")
     sha = models.CharField(max_length=40)
+    # Odcisk ustawien oceny (zadania, modele, testy) z chwili zlecenia: po ich zmianie ocena jest nieaktualna
+    konfiguracja = models.CharField(max_length=32, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OCZEKUJE)
     blad_opis = models.TextField(blank=True)
     testy = models.JSONField(default=dict, blank=True)
@@ -469,3 +644,101 @@ class Precedens(models.Model):
 
     def __str__(self):
         return self.tresc[:60]
+
+
+class Poprawka(models.Model):
+    """Zmiana w repozytorium zrodlowym przeniesiona do repozytoriow studentow grupy."""
+
+    class Stan(models.TextChoices):
+        OCZEKUJE = "oczekuje", "oczekuje"
+        W_TOKU = "w_toku", "w toku"
+        GOTOWA = "gotowa", "wprowadzona"
+        BEZ_ZMIAN = "bez_zmian", "brak zmian w źródle"
+        BLAD = "blad", "błąd"
+
+    przydzial = models.ForeignKey(Przydzial, on_delete=models.CASCADE, related_name="poprawki")
+    numer = models.PositiveSmallIntegerField()
+    opis = models.TextField("opis poprawki", blank=True)
+    autoscalanie = models.BooleanField("scalaj automatycznie, gdy nie ma konfliktu", default=True)
+    stan = models.CharField(max_length=20, choices=Stan.choices, default=Stan.OCZEKUJE)
+    blad_opis = models.TextField(blank=True)
+    pliki = models.JSONField(default=list, blank=True)
+    sha_przed = models.CharField(max_length=40, blank=True)
+    sha_po = models.CharField(max_length=40, blank=True)
+    utworzono = models.DateTimeField(auto_now_add=True)
+    rozpoczeto = models.DateTimeField(null=True, blank=True)
+    zakonczono = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-utworzono"]
+        verbose_name = "poprawka"
+        verbose_name_plural = "poprawki"
+        constraints = [models.UniqueConstraint(fields=["przydzial", "numer"], name="unikalny_numer_poprawki")]
+
+    def __str__(self):
+        return f"Poprawka {self.numer}: {self.przydzial}"
+
+    @property
+    def galaz(self) -> str:
+        return f"poprawka-{self.numer}"
+
+    @property
+    def w_toku(self) -> bool:
+        return self.stan in (self.Stan.OCZEKUJE, self.Stan.W_TOKU)
+
+
+class PoprawkaZgloszenia(models.Model):
+    """Wynik przeniesienia poprawki do repozytorium jednego studenta."""
+
+    class Stan(models.TextChoices):
+        SCALONA = "scalona", "scalona automatycznie"
+        DO_SCALENIA = "do_scalenia", "czeka na scalenie przez studenta"
+        SCALONA_PRZEZ_STUDENTA = "scalona_student", "scalona przez studenta"
+        POMINIETA = "pominieta", "pominięta"
+        BLAD = "blad", "błąd"
+
+    poprawka = models.ForeignKey(Poprawka, on_delete=models.CASCADE, related_name="zgloszenia")
+    zgloszenie = models.ForeignKey(Zgloszenie, on_delete=models.CASCADE, related_name="poprawki")
+    stan = models.CharField(max_length=20, choices=Stan.choices)
+    pr_numer = models.PositiveIntegerField(null=True, blank=True)
+    konflikty = models.JSONField(default=list, blank=True)
+    komunikat = models.TextField(blank=True)
+    zaktualizowano = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["zgloszenie__student__imie_nazwisko"]
+        constraints = [models.UniqueConstraint(fields=["poprawka", "zgloszenie"], name="poprawka_raz_na_zgloszenie")]
+
+    @property
+    def url_pr(self):
+        return f"{self.zgloszenie.url_repo}/pull/{self.pr_numer}" if self.pr_numer else ""
+
+
+
+# --- Dostep do panelu ---
+
+class KontoProwadzacego(models.Model):
+    """Powiazanie konta GitHub z kontem prowadzacego (logowanie do panelu przez GitHub)."""
+
+    uzytkownik = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="konto_github")
+    github_id = models.BigIntegerField("numer konta GitHub", unique=True)
+    login = models.CharField("login GitHub", max_length=100)
+    ostatnie_logowanie = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "konto prowadzącego"
+        verbose_name_plural = "konta prowadzących"
+
+    def __str__(self):
+        return f"@{self.login}"
+
+
+class NieudaneLogowanie(models.Model):
+    """Nieudana proba logowania haslem: podstawa blokady po kilku probach."""
+
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    nazwa = models.CharField(max_length=150, blank=True)
+    czas = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-czas"]

@@ -1,0 +1,42 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}{{ grupa.nazwa }}, {{ kurs.nazwa }} {{ kurs.rok.nazwa }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with kurs=kurs only %}
+<div class="naglowek">
+  <div><h1>{{ grupa.nazwa }}</h1>
+    <p class="meta">{% if grupa.opis %}<span><b>{{ grupa.opis }}</b></span>{% endif %}<span>{{ kurs.nazwa }} {{ kurs.rok.nazwa }}</span><span>skrót <code>{{ grupa.skrot }}</code></span>
+      {% if not grupa.aktywna %}<span class="znacznik szary">nieaktywna</span>{% endif %}</p>
+  </div>
+  <div class="przyciski"><a class="przycisk" href="{% url 'panel:grupa_edycja' grupa.pk %}">Edytuj grupę</a></div>
+</div>
+<div class="siatka-2">
+  <div>
+    <section class="karta">
+      <h2>Zestawy zadań</h2>
+      {% for p in grupa.zestawy_lista %}{% include "kurs/panel/_przydzial_wiersz.html" %}
+      {% empty %}<p class="slabe">Brak wydanych zestawów.</p>{% endfor %}
+    </section>
+    <section class="karta">
+      <h2>Kolokwia</h2>
+      {% for p in grupa.kolokwia_lista %}{% include "kurs/panel/_przydzial_wiersz.html" %}
+      {% empty %}<p class="slabe">Brak wydanych kolokwiów.</p>{% endfor %}
+    </section>
+  </div>
+  {% if not kurs.zarchiwizowany %}
+  <div class="karta">
+    <h2>Wydaj tej grupie</h2>
+    {% if formularz.fields.zestaw.queryset.exists %}
+    <p class="drugie male">Powstanie repozytorium startowe grupy (kopia źródła bez historii) i link dla studentów.</p>
+    <form method="post" class="formularz">{% csrf_token %}
+      {{ formularz.as_div }}
+      <button class="glowny" type="submit" data-czekaj="Tworzę repozytorium startowe">Wydaj</button>
+    </form>
+    {% else %}
+    <p class="slabe">Wszystkie zestawy i kolokwia tego przedmiotu są już wydane tej grupie.</p>
+    {% endif %}
+    <p class="male"><a href="{% url 'panel:zestaw_nowy' kurs.pk %}">Nowy zestaw</a> ·
+      <a href="{% url 'panel:zestaw_nowy' kurs.pk %}?rodzaj=kolokwium">Nowe kolokwium</a></p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

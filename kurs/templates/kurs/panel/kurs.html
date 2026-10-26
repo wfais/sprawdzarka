@@ -1,0 +1,60 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}{{ kurs.nazwa }} {{ rok.nazwa }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with kurs=kurs bez_kursu=True bez_znacznikow=True only %}
+<div class="naglowek">
+  <div><h1><span class="plakietka" title="{{ rok.uczelnia.nazwa }}">{{ rok.uczelnia.skrot|upper }}</span>{{ kurs.nazwa }} <a class="rok-w-tytule" href="{% url 'panel:rok' rok.pk %}">{{ rok.nazwa }}</a></h1>
+    <p class="meta"><span>{{ rok.uczelnia.nazwa }}</span>{% if kurs.kod %}<span class="kod-przedmiotu">{{ kurs.kod }}</span>{% endif %}{% if kurs.opis %}<span>{{ kurs.opis }}</span>{% endif %}
+      {% if rok.zarchiwizowany %}<span class="znacznik szary">rok zarchiwizowany {{ rok.zarchiwizowano|date:"d.m.Y" }}</span>
+      {% elif kurs.ukryty or rok.ukryty %}<span class="znacznik szary">ukryty na pulpicie{% if rok.ukryty and not kurs.ukryty %} (cały rok){% endif %}</span>{% endif %}</p>
+  </div>
+  <div class="przyciski">
+    {% if not rok.zarchiwizowany %}
+    <a class="przycisk glowny" href="{% url 'panel:zestaw_nowy' kurs.pk %}">Nowy zestaw</a>
+    <a class="przycisk" href="{% url 'panel:zestaw_nowy' kurs.pk %}?rodzaj=kolokwium">Nowe kolokwium</a>
+    {% endif %}
+    <a class="przycisk" href="{% url 'panel:kurs_edycja' kurs.pk %}">Edytuj</a>
+    <form method="post" action="{% url 'panel:kurs_ukryj' kurs.pk %}" class="w-linii">{% csrf_token %}
+      <button type="submit">{% if kurs.ukryty %}Pokaż na pulpicie{% else %}Ukryj{% endif %}</button></form>
+    <a class="przycisk" href="{% url 'panel:kurs_kopiuj' kurs.pk %}" title="Np. na kolejny rok akademicki: wszystkie zestawy i kolokwia z zadaniami i kryteriami">Kopiuj do innego roku</a>
+  </div>
+</div>
+{% if rok.poligon %}
+<div class="uwaga poligon-uwaga">Poligon: dane fikcyjne do prób, bez połączenia z GitHubem. Ocenianie, wysyłanie ocen,
+  zmiany terminów i odświeżanie działają tylko w bazie. Cały poligon usuniesz w <a href="{% url 'panel:administracja' %}">Administracji</a>.</div>
+{% endif %}
+
+{% if rok.zarchiwizowany %}
+<div class="uwaga">Rok {{ rok.nazwa }} jest zarchiwizowany: tylko do odczytu. Robot nie synchronizuje repozytoriów i nie ocenia zgłoszeń.
+  Przywrócisz go albo pobierzesz plik archiwum na stronie <a href="{% url 'panel:rok' rok.pk %}">roku</a>.</div>
+{% endif %}
+
+<h2>Grupy</h2>
+<div class="siatka">
+  {% for grupa in grupy %}
+    {% include "kurs/panel/_karta_grupy.html" with edycja=True %}
+  {% endfor %}
+  {% if rok.zarchiwizowany %}
+  {% if not grupy %}<p class="slabe">Brak grup.</p>{% endif %}
+  {% else %}
+  <details class="karta rozwijana"{% if formularz.errors or not grupy %} open{% endif %}>
+    <summary><h2>Nowa grupa</h2></summary>
+    <form method="post" class="formularz">{% csrf_token %}
+      {{ formularz.as_div }}
+      <button class="glowny" type="submit">Dodaj grupę</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
+<div class="siatka-polowy" style="margin-top:8px">
+  <section class="karta">
+    <h2>Zestawy zadań</h2>
+    {% include "kurs/panel/_tabela_zestawow.html" with lista=zestawy pusta="Brak zestawów w tym przedmiocie." only %}
+  </section>
+  <section class="karta">
+    <h2>Kolokwia</h2>
+    {% include "kurs/panel/_tabela_zestawow.html" with lista=kolokwia pusta="Brak kolokwiów w tym przedmiocie." only %}
+  </section>
+</div>
+{% endblock %}
