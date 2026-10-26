@@ -324,3 +324,16 @@ def test_przedrostek_z_formularza_bez_zmian(github, prowadzacy, zestaw):
     }, zestaw=zestaw)
     assert formularz.is_valid(), formularz.errors
     assert formularz.cleaned_data["przedrostek_repo"] == "set0_"
+
+
+@pytest.mark.django_db
+def test_strona_studenta_bez_readme_i_z_jednym_terminem(client, github, przydzial):
+    zaloguj_studenta(client)
+    strona = client.get(f"/z/{przydzial.token}/").content.decode()
+    assert "Z karą do" in strona
+    client.post(f"/z/{przydzial.token}/", {"imie_nazwisko": "Jan Kowalski"})
+    strona = client.get(f"/z/{przydzial.token}/").content.decode()
+    assert "Twoje repozytorium jest gotowe" in strona and "README" not in strona
+    Przydzial.objects.filter(pk=przydzial.pk).update(termin_twardy=przydzial.termin_miekki)
+    strona = client.get(f"/z/{przydzial.token}/").content.decode()
+    assert "Z karą do" not in strona and "Termin" in strona

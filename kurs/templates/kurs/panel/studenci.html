@@ -1,42 +1,97 @@
 {% extends "kurs/panel/baza.html" %}
 {% block tytul %}Studenci{% endblock %}
 {% block tresc %}
+{% with nastepny=request.get_full_path %}
 <div class="naglowek">
-  <div><h1>Studenci</h1><p class="podtytul">Powiązanie kont GitHub z osobami. Wpis zrobiony raz obowiązuje we wszystkich zestawach.</p></div>
-  <form method="get" class="przyciski">
-    <input type="search" name="q" value="{{ q }}" placeholder="Szukaj loginu lub nazwiska" style="width:240px">
-    <label class="male"><input type="checkbox" name="filtr" value="bez" {% if filtr == "bez" %}checked{% endif %} onchange="this.form.submit()"> tylko bez nazwiska</label>
-  </form>
+  <div><h1>Studenci</h1><p class="podtytul">Według uczelni, roku, przedmiotu i grupy. W kolumnach zestawy wydane grupie:
+    dioda pokazuje stan pracy, kliknięcie otwiera kartę pracy z repozytorium. Imię i nazwisko wpisane raz obowiązuje we wszystkich grupach.
+    Lata i przedmioty ukryte, grupy nieaktywne i lata zarchiwizowane są pominięte.</p></div>
+  <div class="przyciski filtr-studentow">
+    <form method="get" class="przyciski">
+      {% if zakres_pole %}<input type="hidden" name="{{ zakres_pole }}" value="{{ zakres_pk }}">{% endif %}
+      <input type="search" name="q" value="{{ q }}" placeholder="Szukaj loginu lub nazwiska">
+      <label class="male"><input type="checkbox" name="filtr" value="bez" {% if filtr == "bez" %}checked{% endif %} onchange="this.form.submit()"> tylko bez nazwiska</label>
+    </form>
+    <form method="get">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      {% if filtr %}<input type="hidden" name="filtr" value="{{ filtr }}">{% endif %}
+      <select name="rok" onchange="this.form.submit()" aria-label="Rok akademicki">
+        <option value="">widoczne lata</option>
+        {% for r in lata_do_wyboru %}<option value="{{ r.pk }}"{% if wybrany_rok and wybrany_rok.pk == r.pk %} selected{% endif %}>{{ r.pelna_nazwa }}{% if r.zarchiwizowany %} (archiwum){% elif r.ukryty %} (ukryty){% endif %}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
 </div>
-<div class="karta przewijanie">
-  <table class="tabela">
-    <tr><th>Konto</th><th>Imię i nazwisko</th><th>Prace</th><th>Źródło</th><th>Kandydat z README</th></tr>
-    {% for s in studenci %}
-    <tr>
-      <td class="mono">{% if s.fikcyjny %}<span title="konto fikcyjne z poligonu">{{ s.login }}</span>{% else %}<a href="https://github.com/{{ s.login }}" target="_blank" rel="noopener">{{ s.login }}</a>{% endif %}</td>
-      <td>
-        <form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski">{% csrf_token %}
-          <input type="text" name="imie_nazwisko" value="{{ s.imie_nazwisko }}" style="width:220px" placeholder="nieustalone">
-          <input type="hidden" name="nastepny" value="{{ request.get_full_path }}">
-          <button class="maly" type="submit">Zapisz</button>
-        </form>
-      </td>
-      <td><div class="kafelki">{% for z in s.prace %}{% with st=z.stan_pracy %}<a class="kafelek" href="{% url 'panel:zgloszenie' z.pk %}" title="{{ z.przydzial.grupa.nazwa }}: {{ z.przydzial.zestaw.nazwa }} ({{ st.etykieta }})"><i class="dioda {{ st.dioda }}" aria-hidden="true"></i>{{ z.przydzial.zestaw.skrot }}</a>{% endwith %}{% empty %}<span class="slabe male">brak</span>{% endfor %}</div></td>
-      <td class="male drugie">{{ s.get_zrodlo_nazwiska_display }}</td>
-      <td>
-        {% if s.kandydat_readme and not s.imie_nazwisko %}
-        <form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski">{% csrf_token %}
-          <input type="hidden" name="nastepny" value="{{ request.get_full_path }}">
-          <span>{{ s.kandydat_readme }}</span>
-          <button class="maly" name="akcja" value="zatwierdz">Zatwierdź</button>
-          <button class="maly" name="akcja" value="odrzuc">Odrzuć</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="5" class="puste">Brak studentów.</td></tr>
-    {% endfor %}
-  </table>
+
+{% if zakres %}
+<div class="zakres-studentow">
+  <span class="drugie">Pokazuję:</span>
+  {% for etykieta, pole, o in zakres %}{% if not forloop.first %}<span class="slabe">›</span>{% endif %}
+  {% if forloop.last %}<b>{{ etykieta }}</b>{% else %}<a href="?{{ pole }}={{ o.pk }}{{ dodatki }}">{{ etykieta }}</a>{% endif %}{% endfor %}
+  <a class="przycisk maly" href="{{ request.path }}{% if reszta %}?{{ reszta }}{% endif %}">pokaż wszystkich</a>
 </div>
+{% endif %}
+
+{% for u in uczelnie %}
+<div class="poziom-studentow poziom-uczelni">
+  <h2><span class="plakietka">{{ u.uczelnia.skrot|upper }}</span>{{ u.uczelnia.nazwa }} <span class="drugie male">osób: {{ u.liczba }}</span></h2>
+  <a class="przycisk maly" href="?uczelnia={{ u.uczelnia.pk }}{{ dodatki }}" title="Tylko studenci tej uczelni">pokaż</a>
+</div>
+{% for r in u.lista_lat %}
+<section class="sekcja-roku{% if r.rok.poligon %} poligon{% endif %}">
+  <div class="naglowek">
+    <div><h2><a href="{% url 'panel:rok' r.rok.pk %}">{{ r.rok.nazwa }}</a> <span class="drugie male">osób: {{ r.liczba }}</span></h2>
+      <p>{% if r.rok.poligon %}<span class="znacznik zolty">poligon: dane fikcyjne</span>{% endif %}{% if r.rok.zarchiwizowany %}<span class="znacznik szary">zarchiwizowany</span>{% endif %}</p></div>
+    <div class="przyciski"><a class="przycisk maly" href="?rok={{ r.rok.pk }}{{ dodatki }}" title="Tylko studenci tego roku">pokaż</a></div>
+  </div>
+  {% for k in r.lista_kursow %}
+  <div class="poziom-studentow">
+    <h3><a href="{% url 'panel:kurs' k.kurs.pk %}">{{ k.kurs.nazwa }}</a>{% if k.kurs.kod %} <span class="kod-przedmiotu">{{ k.kurs.kod }}</span>{% endif %} <span class="drugie male">osób: {{ k.liczba }}</span></h3>
+    <a class="przycisk maly" href="?kurs={{ k.kurs.pk }}{{ dodatki }}" title="Tylko studenci tego przedmiotu">pokaż</a>
+  </div>
+  {% for g in k.grupy %}
+  <details class="karta rozwijana grupa-studentow" open>
+    <summary><h2>{{ g.grupa.nazwa }} <span class="drugie male">{% if g.grupa.opis %}{{ g.grupa.opis }} · {% endif %}osób: {{ g.wiersze|length }}</span></h2>
+      <a class="przycisk maly" href="?grupa={{ g.grupa.pk }}{{ dodatki }}" title="Tylko ta grupa">pokaż</a></summary>
+    <div class="przewijanie">
+    <table class="tabela tabela-studentow">
+      <tr><th class="lp">Lp.</th><th>Imię i nazwisko</th><th>Konto GitHub</th>
+        {% for p in g.kolumny %}<th class="kolumna-zestawu"><a href="{% url 'panel:przydzial' p.pk %}" title="{{ p.zestaw.nazwa }}, termin {{ p.termin_miekki|date:'d.m H:i' }}">{{ p.zestaw.skrot }}</a></th>{% endfor %}</tr>
+      {% for w in g.wiersze %}
+      <tr>
+        <td class="lp slabe">{{ forloop.counter }}</td>
+        <td>{% include "kurs/panel/_nazwisko_studenta.html" with s=w.student nastepny=nastepny only %}</td>
+        <td>{% include "kurs/panel/_konto_studenta.html" with s=w.student only %}</td>
+        {% for z in w.komorki %}<td class="kolumna-zestawu">{% if z %}{% with st=z.stan_pracy %}<a class="kafelek" href="{% url 'panel:zgloszenie' z.pk %}" title="{{ z.repo_nazwa|default:z.przydzial.zestaw.nazwa }}: {{ st.etykieta }}"><i class="dioda {{ st.dioda }}" aria-hidden="true"></i>{% if z.punkty is not None %}{{ z.punkty|floatformat:"-2" }} pkt{% else %}{{ z.przydzial.zestaw.skrot }}{% endif %}</a>{% endwith %}{% else %}<span class="slabe male" title="nie zaakceptował">brak</span>{% endif %}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+  </details>
+  {% endfor %}
+  {% endfor %}
+</section>
+{% endfor %}
+{% endfor %}
+
+{% if bez_grupy %}
+<section class="sekcja-roku">
+  <div class="naglowek"><div><h2>Konta bez prac</h2>
+    <p><span>Konta, które mają tylko wyzerowane zgłoszenia.</span></p></div></div>
+  <div class="karta przewijanie">
+    <table class="tabela tabela-studentow">
+      <tr><th>Imię i nazwisko</th><th>Konto GitHub</th></tr>
+      {% for s in bez_grupy %}
+      <tr><td>{% include "kurs/panel/_nazwisko_studenta.html" with s=s nastepny=nastepny only %}</td>
+        <td>{% include "kurs/panel/_konto_studenta.html" with s=s only %}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if not uczelnie and not bez_grupy %}
+<p class="puste">{% if q or filtr %}Nikt nie pasuje do wyszukiwania.{% elif zakres %}Na tym poziomie nie ma jeszcze studentów.{% else %}Brak studentów. Pojawią się, gdy zaakceptują pierwszy zestaw.{% endif %}</p>
+{% endif %}
+{% endwith %}
 {% endblock %}

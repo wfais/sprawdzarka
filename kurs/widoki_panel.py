@@ -2,6 +2,7 @@
 import logging
 import secrets
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
@@ -55,6 +56,15 @@ def _dolacz_liczniki(przydzialy):
         p.paski = [(s, p.liczniki[s.klucz]) for s in stany.PRACE if p.liczniki[s.klucz]]
         p.stan = stany.zestaw(p.publikacja, p.termin_miekki, p.termin_twardy, teraz, p.do_oceny)
     return przydzialy
+
+
+def _zadan(n: int) -> str:
+    """1 zadanie, 2 zadania, 5 zadan (odmiana przez liczby)."""
+    if n == 1:
+        return "1 zadanie"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} zadania"
+    return f"{n} zadań"
 
 
 def _zamrozony(request, rok) -> bool:
@@ -637,7 +647,7 @@ def zestaw_nowy(request, pk):
         try:
             liczba_zadan = ocena.utworz_zadania_z_katalogow(zestaw, zastap=False)
             if liczba_zadan:
-                messages.info(request, f"Utworzono {liczba_zadan} zadań na podstawie katalogów repozytorium. Sprawdź punkty.")
+                messages.info(request, f"Utworzono {_zadan(liczba_zadan)} na podstawie katalogów repozytorium. Sprawdź punkty.")
         except ocena.BladOceny as blad:
             log.info("Brak propozycji zadan z katalogow dla %s: %s", zestaw, blad)
         return redirect("panel:zestaw", pk=zestaw.pk)
@@ -1066,20 +1076,110 @@ def zgloszenie_odswiez(request, pk):
 
 # --- Studenci ---
 
+def _zakres_studentow(request):
+    """Wybrany poziom struktury (najwezszy z podanych): grupa, przedmiot, rok albo uczelnia."""
+    for nazwa, model, sciezka in [("grupa", Grupa, "przydzial__grupa"), ("kurs", Kurs, "przydzial__grupa__kurs"),
+                                  ("rok", Rok, "przydzial__grupa__kurs__rok"),
+                                  ("uczelnia", Uczelnia, "przydzial__grupa__kurs__rok__uczelnia")]:
+        pk = request.GET.get(nazwa, "")
+        if pk.isdigit():
+            obiekt = model.objects.filter(pk=pk).first()
+            if obiekt is not None:
+                return nazwa, obiekt, sciezka
+    return None, None, None
+
+
+def _okruszki_zakresu(nazwa, obiekt):
+    """Lista (etykieta, parametr, obiekt) od uczelni do wybranego poziomu."""
+    if nazwa is None:
+        return []
+    grupa = obiekt if nazwa == "grupa" else None
+    kurs = grupa.kurs if grupa else (obiekt if nazwa == "kurs" else None)
+    rok = kurs.rok if kurs else (obiekt if nazwa == "rok" else None)
+    uczelnia = rok.uczelnia if rok else obiekt
+    lista = [(uczelnia.skrot.upper(), "uczelnia", uczelnia)]
+    lista += [(rok.nazwa, "rok", rok)] if rok else []
+    lista += [(kurs.nazwa, "kurs", kurs)] if kurs else []
+    lista += [(grupa.nazwa, "grupa", grupa)] if grupa else []
+    return lista
+
+
 @prowadzacy
 def studenci(request):
-    prace = (Zgloszenie.objects.exclude(status=Zgloszenie.Status.WYZEROWANE)
-             .exclude(przydzial__zestaw__kurs__rok__zarchiwizowany=True)
-             .select_related("przydzial__zestaw__kurs__rok", "przydzial__grupa").order_by("przydzial__termin_miekki"))
-    lista = Student.objects.prefetch_related(Prefetch("zgloszenia", queryset=prace, to_attr="prace"))
+    """Studenci wedlug struktury: uczelnia, rok, przedmiot, grupa; w grupie tabela prac w kolejnych zestawach.
+
+    Na kazdym poziomie "pokaz" zaweza strone do tego poziomu (parametry uczelnia, rok, kurs, grupa).
+    """
+    zakres, obiekt, sciezka = _zakres_studentow(request)
     filtr = request.GET.get("filtr", "")
-    if filtr == "bez":
-        lista = lista.filter(imie_nazwisko="")
     szukaj = request.GET.get("q", "").strip()
+
+    prace = (Zgloszenie.objects.exclude(status=Zgloszenie.Status.WYZEROWANE)
+             .select_related("student", "przydzial__zestaw", "przydzial__grupa__kurs__rok__uczelnia"))
+    if zakres:
+        prace = prace.filter(**{sciezka: obiekt})
+    # Ponizej wybranego poziomu bez ukrytych i nieaktywnych; sam wybrany poziom pokazuje sie zawsze
+    if zakres in (None, "uczelnia"):
+        prace = prace.exclude(przydzial__grupa__kurs__rok__zarchiwizowany=True).exclude(
+            przydzial__grupa__kurs__rok__ukryty=True)
+    if zakres in (None, "uczelnia", "rok"):
+        prace = prace.exclude(przydzial__grupa__kurs__ukryty=True)
+    if zakres in (None, "uczelnia", "rok", "kurs"):
+        prace = prace.exclude(przydzial__grupa__aktywna=False)
+    osoby = Student.objects.all()
+    if filtr == "bez":
+        osoby = osoby.filter(imie_nazwisko="")
     if szukaj:
-        lista = lista.filter(Q(login__icontains=szukaj) | Q(imie_nazwisko__icontains=szukaj))
-    lista = sorted(lista, key=lambda s: s.klucz_sortowania)
-    return render(request, "kurs/panel/studenci.html", {"studenci": lista, "filtr": filtr, "q": szukaj})
+        osoby = osoby.filter(Q(login__icontains=szukaj) | Q(imie_nazwisko__icontains=szukaj))
+    prace = prace.filter(student__in=osoby)
+
+    grupy = {}
+    for z in prace:
+        g = z.przydzial.grupa
+        wpis = grupy.setdefault(g.pk, {"grupa": g, "studenci": {}})
+        wpis["studenci"].setdefault(z.student_id, {"student": z.student, "prace": {}})["prace"][z.przydzial_id] = z
+    kolumny = {}
+    for p in Przydzial.objects.filter(grupa_id__in=grupy).select_related("zestaw").order_by("termin_miekki"):
+        kolumny.setdefault(p.grupa_id, []).append(p)
+
+    uczelnie = {}
+    for wpis in grupy.values():
+        g = wpis["grupa"]
+        wpis["kolumny"] = kolumny.get(g.pk, [])
+        wpis["wiersze"] = sorted(
+            ({"student": w["student"], "komorki": [w["prace"].get(p.pk) for p in wpis["kolumny"]]}
+             for w in wpis["studenci"].values()),
+            key=lambda w: w["student"].klucz_sortowania)
+        rok = g.kurs.rok
+        u = uczelnie.setdefault(rok.uczelnia_id, {"uczelnia": rok.uczelnia, "lata": {}})
+        r = u["lata"].setdefault(rok.pk, {"rok": rok, "kursy": {}})
+        r["kursy"].setdefault(g.kurs_id, {"kurs": g.kurs, "grupy": []})["grupy"].append(wpis)
+    lista = sorted(uczelnie.values(), key=lambda u: (u["uczelnia"].kolejnosc, u["uczelnia"].nazwa))
+    for u in lista:
+        u["lista_lat"] = sorted(u["lata"].values(), key=lambda r: r["rok"].nazwa, reverse=True)
+        u["lista_lat"].sort(key=lambda r: r["rok"].poligon)  # poligon na koncu
+        for r in u["lista_lat"]:
+            r["lista_kursow"] = sorted(r["kursy"].values(), key=lambda k: k["kurs"].nazwa)
+            for k in r["lista_kursow"]:
+                k["grupy"].sort(key=lambda w: w["grupa"].nazwa)
+                k["liczba"] = len({w["student"].pk for g in k["grupy"] for w in g["wiersze"]})
+            r["liczba"] = len({w["student"].pk for k in r["lista_kursow"] for g in k["grupy"] for w in g["wiersze"]})
+        u["liczba"] = len({w["student"].pk for r in u["lista_lat"] for k in r["lista_kursow"]
+                           for g in k["grupy"] for w in g["wiersze"]})
+
+    # Konta bez zadnej pracy (np. tylko wyzerowane zgloszenia): tez do ustalenia nazwiska
+    bez_grupy = []
+    if zakres is None:
+        aktywne = Zgloszenie.objects.exclude(status=Zgloszenie.Status.WYZEROWANE).values("student_id")
+        bez_grupy = sorted(osoby.exclude(pk__in=aktywne), key=lambda s: s.klucz_sortowania)
+    reszta = urlencode({k: v for k, v in (("q", szukaj), ("filtr", filtr)) if v})
+    return render(request, "kurs/panel/studenci.html", {
+        "uczelnie": lista, "bez_grupy": bez_grupy, "zakres": _okruszki_zakresu(zakres, obiekt),
+        "zakres_pole": zakres, "zakres_pk": obiekt.pk if obiekt else "",
+        "reszta": reszta, "dodatki": f"&{reszta}" if reszta else "",
+        "lata_do_wyboru": Rok.objects.select_related("uczelnia"),
+        "wybrany_rok": obiekt if zakres == "rok" else None, "filtr": filtr, "q": szukaj,
+    })
 
 
 @prowadzacy
@@ -1147,7 +1247,7 @@ def zestaw_z_katalogow(request, pk):
     zestaw = get_object_or_404(Zestaw, pk=pk)
     try:
         liczba_zadan = ocena.utworz_zadania_z_katalogow(zestaw)
-        messages.success(request, f"Utworzono {liczba_zadan} zadań na podstawie katalogów repozytorium. "
+        messages.success(request, f"Utworzono {_zadan(liczba_zadan)} na podstawie katalogów repozytorium. "
                                   "Sprawdź punkty i sposób oceny, popraw i zapisz.")
         return redirect("panel:zestaw_zadania", pk=pk)
     except ocena.BladOceny as blad:

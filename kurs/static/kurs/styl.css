@@ -336,3 +336,26 @@ details summary { cursor: pointer; color: var(--drugi); }
 /* --- Rok w tytule przedmiotu --- */
 .rok-w-tytule { color: var(--drugi); font-weight: 500; }
 .rok-w-tytule:hover { color: var(--tekst); }
+
+/* --- Pomoc przy terminach --- */
+.pomoc-terminu { margin-top: 6px; }
+label.pomoc-terminu { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--drugi); font-weight: 400; cursor: pointer; }
+label.pomoc-terminu input { width: auto; margin: 0; }
+td .pomoc-terminu { display: flex; margin-top: 4px; }
+
+/* --- Studenci wedlug grup --- */
+.filtr-studentow input[type="search"] { width: 240px; }
+.filtr-studentow select { width: auto; max-width: 260px; }
+.grupa-studentow > summary h2 { font-size: 18px; }
+.tabela-studentow td { vertical-align: middle; }
+.tabela-studentow .lp { width: 36px; text-align: right; }
+.tabela-studentow .kolumna-zestawu { text-align: center; white-space: nowrap; }
+.nazwisko-studenta input[type="text"] { width: 220px; }
+.kandydat-readme { margin-top: 4px; }
+.poziom-studentow { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 18px 0 10px; }
+.poziom-studentow h2, .poziom-studentow h3 { margin: 0; }
+.poziom-uczelni { margin-top: 26px; padding-bottom: 8px; border-bottom: 2px solid var(--linia-mocna); }
+.poziom-uczelni:first-of-type { margin-top: 8px; }
+.grupa-studentow > summary { gap: 12px; }
+.grupa-studentow > summary .przycisk { margin-left: auto; }
+.zakres-studentow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }

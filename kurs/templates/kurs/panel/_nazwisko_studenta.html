@@ -1,0 +1,13 @@
+<form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski nazwisko-studenta">{% csrf_token %}
+  <input type="text" name="imie_nazwisko" value="{{ s.imie_nazwisko }}" placeholder="nieustalone" aria-label="Imię i nazwisko">
+  <input type="hidden" name="nastepny" value="{{ nastepny }}">
+  <button class="maly" type="submit">Zapisz</button>
+</form>
+{% if s.kandydat_readme and not s.imie_nazwisko %}
+<form method="post" action="{% url 'panel:student_nazwisko' s.pk %}" class="przyciski male kandydat-readme">{% csrf_token %}
+  <input type="hidden" name="nastepny" value="{{ nastepny }}">
+  <span>z README: <b>{{ s.kandydat_readme }}</b></span>
+  <button class="maly" name="akcja" value="zatwierdz">Zatwierdź</button>
+  <button class="maly" name="akcja" value="odrzuc">Odrzuć</button>
+</form>
+{% endif %}

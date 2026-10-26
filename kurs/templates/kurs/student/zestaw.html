@@ -5,10 +5,12 @@
 {% if messages %}<ul class="komunikaty">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
 <div class="okruszki">{{ przydzial.grupa.nazwa }}</div>
 <h1>{{ przydzial.zestaw.nazwa }}</h1>
+{% with miekki=zgloszenie.termin_miekki|default:przydzial.termin_miekki twardy=zgloszenie.termin_twardy|default:przydzial.termin_twardy %}
 <dl class="opis-pola" style="margin:12px 0 18px">
-  <dt>Termin</dt><dd><strong>{% if zgloszenie %}{{ zgloszenie.termin_miekki|date:"d.m.Y, H:i" }}{% else %}{{ przydzial.termin_miekki|date:"d.m.Y, H:i" }}{% endif %}</strong></dd>
-  <dt>Z karą do</dt><dd>{% if zgloszenie %}{{ zgloszenie.termin_twardy|date:"d.m.Y, H:i" }}{% else %}{{ przydzial.termin_twardy|date:"d.m.Y, H:i" }}{% endif %}</dd>
+  <dt>Termin</dt><dd><strong>{{ miekki|date:"d.m.Y, H:i" }}</strong></dd>
+  {% if twardy != miekki %}<dt>Z karą do</dt><dd>{{ twardy|date:"d.m.Y, H:i" }}</dd>{% endif %}
 </dl>
+{% endwith %}
 
 {% if zgloszenie and zgloszenie.status == Status.GOTOWE %}
   <h2>Twoje repozytorium jest gotowe</h2>
@@ -30,7 +32,6 @@
     <li>Sklonuj repozytorium:
       <div class="kopiuj" style="margin-top:4px"><input id="klon" type="text" readonly value="git clone {{ zgloszenie.url_repo }}.git"><button type="button" data-kopiuj="klon">Kopiuj</button></div></li>
     <li>Rozwiązuj zadania i wysyłaj zmiany: <code>git add</code>, <code>git commit</code>, <code>git push</code> na gałąź <code>{{ galaz }}</code>. Możesz wypychać dowolnie często, liczy się czas wypchnięcia.</li>
-    <li>W pliku <code>README.md</code> wpisz swoje imię i nazwisko.</li>
   </ol>
   <p class="drugie male">Nie zmieniaj nazwy repozytorium. Pull request „Feedback” zostaw otwarty: tam pojawią się uwagi i ocena.</p>
   <form method="post" class="przyciski" style="margin-bottom:10px">{% csrf_token %}
