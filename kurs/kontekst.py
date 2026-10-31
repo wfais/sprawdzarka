@@ -36,3 +36,14 @@ def sekcja_panelu(request):
         if sciezka.startswith(przedrostek):
             return {"sekcja_panelu": sekcja}
     return {"sekcja_panelu": ""}
+
+
+def tryb_serwisowy(request):
+    """Tryb serwisowy: czerwona dioda przy nazwie Sprawdzarki."""
+    from django.db import DatabaseError
+
+    from .models import UstawieniaSerwisu
+    try:
+        return {"tryb_serwisowy": UstawieniaSerwisu.w_trybie_serwisowym()}
+    except DatabaseError:  # np. przed migracja bazy
+        return {"tryb_serwisowy": False}

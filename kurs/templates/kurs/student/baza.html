@@ -9,7 +9,7 @@
 </head>
 <body>
 <div class="student-tlo">
-  <div class="student-marka"><i class="dioda zielony" aria-hidden="true"></i>Sprawdzarka</div>
+  <div class="student-marka"><i class="dioda {% if tryb_serwisowy %}czerwony{% else %}zielony{% endif %}" aria-hidden="true"{% if tryb_serwisowy %} title="Tryb serwisowy: linki dla studentów pokazują stronę o pracach serwisowych"{% endif %}></i>Sprawdzarka</div>
   <div class="student-karta">{% block tresc %}{% endblock %}</div>
 </div>
 <script src="{% static 'kurs/panel.js' %}?v={{ wersja_statyki }}"></script>

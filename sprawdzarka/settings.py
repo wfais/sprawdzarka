@@ -86,6 +86,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "kurs.kontekst.statyka",
                 "kurs.kontekst.sekcja_panelu",
+                "kurs.kontekst.tryb_serwisowy",
             ],
         },
     },

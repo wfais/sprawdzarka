@@ -70,7 +70,7 @@ ZESTAW = {s.klucz: s for s in ZESTAWY}
 
 def zestaw(publikacja: Optional[datetime], termin_miekki: datetime, termin_twardy: datetime, teraz: datetime,
            do_oceny: int) -> Stan:
-    """do_oceny: liczba oddanych prac, ktorych ocena nie zostala jeszcze wyslana studentowi."""
+    """do_oceny: liczba zaakceptowanych prac (takze bez kodu, te na 0 pkt) bez wystawionej oceny."""
     if publikacja and teraz < publikacja:
         return ZESTAW["nieopublikowany"]
     if teraz < termin_miekki:

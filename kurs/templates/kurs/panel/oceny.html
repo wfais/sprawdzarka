@@ -10,8 +10,7 @@
   {% if przydzialy %}
   <table class="tabela tabela-oceny">
     <tr><th>Zestaw</th><th>Przedmiot i grupa</th><th>Stan</th><th>Termin ostateczny</th><th class="liczba">Oddane</th>
-      <th>Ocena automatyczna</th><th class="liczba" title="Prace z oddanym kodem i otwartym pull requestem: czekają na Twoją decyzję i wysyłkę">Do decyzji</th>
-      <th class="liczba">Wysłane</th><th></th></tr>
+      <th>Ocena automatyczna</th><th>Oceniono</th><th></th></tr>
     {% for p in przydzialy %}
     <tr>
       <td><a href="{% url 'panel:przydzial' p.pk %}"><strong>{{ p.zestaw.nazwa }}</strong></a>{% if p.zestaw.kolokwium %}<div><span class="znacznik fiolet">kolokwium</span></div>{% endif %}</td>
@@ -23,9 +22,8 @@
         <span>gotowe <b>{{ p.automatyczne.gotowe }}</b></span>
         {% if p.automatyczne.w_toku %}<span>w toku <b>{{ p.automatyczne.w_toku }}</b></span>{% endif %}
         {% if p.automatyczne.bledy %}<span class="blad-tekst" style="font-family:inherit">błędy <b>{{ p.automatyczne.bledy }}</b></span>{% endif %}</span></td>
-      <td class="liczba"><a href="{% url 'panel:przydzial' p.pk %}?stan=do_oceny">{{ p.do_oceny }}</a></td>
-      <td class="liczba">{{ p.wyslane }}</td>
-      <td>{% if p.do_oceny %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}"
+      <td>{% include "kurs/panel/_licznik_ocen.html" with p=p only %}</td>
+      <td>{% if p.do_oceny_automatycznej %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}"
           data-potwierdz="Ocenić automatycznie oddane prace bez aktualnej oceny ({{ p.zestaw.nazwa }}, {{ p.grupa.nazwa }})?">{% csrf_token %}
           <input type="hidden" name="nastepny" value="oceny">
           <button class="maly" type="submit" data-czekaj="Dodaję do kolejki">Oceń</button></form>{% endif %}</td>
@@ -33,7 +31,7 @@
     {% endfor %}
   </table>
   <p class="drugie male" style="margin-top:10px">Ocena automatyczna obejmuje prace z oddanym kodem i otwartym pull requestem.
-    Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo liczba „Do decyzji”).
+    Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo licznik „oceniono”).
     Tu są przedmioty widoczne na pulpicie.</p>
   {% else %}
   <p class="puste">Nikt jeszcze nie oddał prac w przedmiotach widocznych na pulpicie.</p>

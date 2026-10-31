@@ -450,6 +450,12 @@ def utworz(teraz: Optional[datetime] = None, ziarno: int = 2026) -> Rok:
                 p_oceny, p_wyslania = OCENIANIE.get(zs["etap"], (0, 0))
                 for student, profil in zip(sklad, profile):
                     z = _utworz_prace(przydzial, student, profil, spec, zs["zadania"], teraz, rng)
+                    if (z is not None and not z.sha_oceniany and zs["etap"] == "ocenione"
+                            and z.status == Zgloszenie.Status.GOTOWE):
+                        Zgloszenie.objects.filter(pk=z.pk).update(
+                            punkty=Decimal(0), mnoznik=Decimal(0), pr_zamkniety=True, komentarz_koncowy="Brak kodu.",
+                            oceniono=min(teraz, twardy + timedelta(days=2)))
+                        continue
                     if z is None or not z.sha_oceniany or rng.random() >= p_oceny:
                         continue
                     if profil == "przeterminowane" and zs["etap"] == "po_terminie":

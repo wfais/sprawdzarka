@@ -14,7 +14,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from . import logowanie as dostep, uslugi
 from .forms import FormularzAkceptacji
 from .github import klient as gh
-from .models import Przydzial, Student, Zgloszenie
+from .models import Przydzial, Student, UstawieniaSerwisu, Zgloszenie
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +85,8 @@ def wyloguj(request):
 
 
 def zestaw(request, token):
+    if UstawieniaSerwisu.w_trybie_serwisowym():
+        return render(request, "kurs/student/serwis.html", status=503)
     przydzial = get_object_or_404(Przydzial.objects.select_related("zestaw__kurs__rok", "grupa"), token=token)
     if przydzial.w_poligonie:
         return render(request, "kurs/student/niedostepny.html", {"przydzial": przydzial, "poligon": True})

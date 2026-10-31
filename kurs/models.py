@@ -2,6 +2,7 @@
 import re
 import secrets
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -421,6 +422,27 @@ class Zgloszenie(models.Model):
         return bool(self.wyjatek_termin_miekki or self.wyjatek_termin_twardy)
 
     @property
+    def oceniona(self) -> bool:
+        return self.pr_zamkniety or self.punkty is not None
+
+    @property
+    def mnoznik_biezacy(self) -> Optional[Decimal]:
+        """Mnoznik do pokazania: decyzja prowadzacego, sugestia z terminow, a bez oddanego kodu wynikajacy
+        z chwili obecnej (przed terminem 1, w czasie na spoznienia mnoznik spoznienia, po terminie ostatecznym 0)."""
+        if self.status != self.Status.GOTOWE:
+            return None
+        if self.mnoznik is not None:
+            return self.mnoznik
+        if self.sugerowany_mnoznik is not None:
+            return self.sugerowany_mnoznik
+        teraz = timezone.now()
+        if teraz <= self.termin_miekki:
+            return Decimal(1)
+        if teraz <= self.termin_twardy:
+            return Decimal(settings.SPRAWDZARKA_MNOZNIK_SPOZNIENIA)
+        return Decimal(0)
+
+    @property
     def stan_pracy(self):
         """Stan do wyswietlenia dioda (otwarte, w terminie, przeterminowane, po terminie, nie oddano...)."""
         return stany.praca(self.status, self.stan_kolor, self.sugerowany_mnoznik, self.termin_miekki, timezone.now())
@@ -748,3 +770,24 @@ class NieudaneLogowanie(models.Model):
 
     class Meta:
         ordering = ["-czas"]
+
+
+class UstawieniaSerwisu(models.Model):
+    """Ustawienia calego serwisu zmieniane w panelu (jeden wiersz)."""
+
+    tryb_serwisowy = models.BooleanField(
+        "tryb serwisowy", default=False,
+        help_text="Linki dla studentów pokazują stronę o pracach serwisowych; panel prowadzącego działa normalnie.",
+    )
+    zmieniono = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "ustawienia serwisu"
+
+    @classmethod
+    def biezace(cls) -> "UstawieniaSerwisu":
+        return cls.objects.get_or_create(pk=1)[0]
+
+    @classmethod
+    def w_trybie_serwisowym(cls) -> bool:
+        return cls.objects.filter(pk=1, tryb_serwisowy=True).exists()

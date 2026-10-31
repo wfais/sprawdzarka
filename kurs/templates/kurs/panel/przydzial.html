@@ -62,9 +62,10 @@
   {% endif %}
   <div class="liczniki">
     <a class="licznik{% if not filtr %} aktywny{% endif %}" href="?"><b>{{ wszystkich }}</b> wszyscy</a>
-    {% if przydzial.do_oceny %}<a class="licznik{% if filtr == 'do_oceny' %} aktywny{% endif %}" href="?stan=do_oceny" title="oddane prace bez wysłanej oceny"><b>{{ przydzial.do_oceny }}</b> do oceny</a>{% endif %}
     {% for s, n in przydzial.paski %}<a class="licznik{% if filtr == s.klucz %} aktywny{% endif %}" href="?stan={{ s.klucz }}" title="{{ s.opis }}"><i class="dioda {{ s.dioda }}" aria-hidden="true"></i><b>{{ n }}</b> {{ s.etykieta }}</a>{% endfor %}
     {% if przydzial.testy %}<a class="licznik alarm{% if filtr == 'testy' %} aktywny{% endif %}" href="?stan=testy" title="studenci, którzy zmienili pliki testów"><b>{{ przydzial.testy }}</b> zmienione testy</a>{% endif %}
+    <span class="separator-licznikow" aria-hidden="true"></span>
+    {% include "kurs/panel/_licznik_ocen.html" with p=przydzial filtr=filtr only %}
   </div>
 </div>
 
@@ -73,8 +74,9 @@
     <tr>
       <th>{% if do_wyslania %}<input type="checkbox" data-zaznacz-wszystkie="zgl" title="zaznacz wszystkie oceny gotowe do wysłania">{% endif %}</th>
       <th>Student</th><th>Konto</th><th>Stan pracy</th><th>Ostatnie wypchnięcie</th>
-      <th>Ocena automatyczna</th>
-      <th class="liczba">Mnożnik</th><th class="liczba">Ocena</th><th>GitHub</th>
+      <th class="kolumna-oceny" title="Ocena automatyczna: testy i modele">Ocena</th>
+      <th class="liczba" title="1 w terminie, mniejszy za zmiany w czasie na spóźnienia, 0 po terminie ostatecznym">Mnożnik</th>
+      <th class="liczba">Punkty</th><th>GitHub</th>
     </tr>
     {% for z in zgloszenia %}
     <tr class="klik" data-href="{% url 'panel:zgloszenie' z.pk %}">
@@ -88,16 +90,16 @@
       <td class="mono">{{ z.student.login }}</td>
       <td>{% include "kurs/panel/_znacznik.html" %}</td>
       <td class="male">{% if z.ostatnie_wypchniecie %}{{ z.ostatnie_wypchniecie|date:"d.m H:i" }}{% else %}<span class="slabe">brak</span>{% endif %}</td>
-      <td>{% with e=z.ostatnia_ewaluacja %}{% if e %}
+      <td class="kolumna-oceny">{% with e=z.ostatnia_ewaluacja %}{% if e %}
         {% if e.w_toku %}<span class="znacznik niebieski">{{ e.get_status_display }}</span>
         {% elif e.status == "blad" %}<span class="znacznik czerwony" title="{{ e.blad_opis }}">błąd</span>
-        {% elif e.zatwierdzona %}<span class="znacznik szary">zatwierdzona{% if e.automatycznie %} automatycznie{% endif %}</span>
-        {% elif e.sporna %}<span class="znacznik zolty" title="wymaga decyzji">do decyzji {{ e.suma|floatformat:"-2" }}</span>
-        {% else %}<span class="znacznik zielony" title="modele zgodne">zgodna {{ e.suma|floatformat:"-2" }}</span>{% endif %}
+        {% elif e.zatwierdzona %}<span class="znacznik szary" title="zatwierdzona{% if e.automatycznie %} automatycznie{% endif %}">zatwierdzona</span>
+        {% elif e.sporna %}<span class="znacznik zolty" title="modele się różnią, wymaga Twojej decyzji">sporna {{ e.suma|floatformat:"-2" }}</span>
+        {% else %}<span class="znacznik zielony" title="modele zgodne">{{ e.suma|floatformat:"-2" }} pkt</span>{% endif %}
         {% if z.ocena_nieaktualna %}<div class="male slabe" title="student zmienił oceniany stan albo zmieniono zadania lub modele; kliknij Oceń">nieaktualna</div>{% endif %}
       {% else %}<span class="slabe male">brak</span>{% endif %}{% endwith %}</td>
-      <td class="liczba">{% if z.mnoznik is not None %}<strong>{{ z.mnoznik|floatformat:"-2" }}</strong>{% elif z.sugerowany_mnoznik is not None %}<span class="slabe" title="sugestia">{{ z.sugerowany_mnoznik|floatformat:"-2" }}?</span>{% endif %}</td>
-      <td class="liczba">{% if z.pr_zamkniety %}<strong>{{ z.wynik|floatformat:"-2" }}</strong>{% else %}<span class="slabe">-</span>{% endif %}</td>
+      <td class="liczba">{% with m=z.mnoznik_biezacy %}{% if m is not None %}{% if z.mnoznik is not None %}<strong title="Twoja decyzja">{{ m|floatformat:"-2" }}</strong>{% else %}<span title="wynika z terminów">{{ m|floatformat:"-2" }}</span>{% endif %}{% endif %}{% endwith %}</td>
+      <td class="liczba">{% if z.oceniona and z.wynik is not None %}<strong>{{ z.wynik|floatformat:"-2" }}</strong>{% else %}<span class="slabe">-</span>{% endif %}</td>
       <td class="male">{% if przydzial.w_poligonie %}<span class="slabe">fikcyjne</span>{% else %}{% if z.url_repo %}<a href="{{ z.url_repo }}" target="_blank" rel="noopener">repo</a>{% endif %}
         {% if z.url_pr %} · <a href="{{ z.url_pr_pliki }}" target="_blank" rel="noopener">zmiany</a>{% endif %}{% endif %}</td>
     </tr>

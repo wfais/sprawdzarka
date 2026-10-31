@@ -17,6 +17,7 @@ urlpatterns = [
     path("oceny/", w.oceny, name="oceny"),
     path("ustawienia/", w.ustawienia, name="ustawienia"),
     path("ustawienia/wczytaj-archiwum/", w.wczytaj_archiwum, name="wczytaj_archiwum"),
+    path("ustawienia/tryb-serwisowy/", w.tryb_serwisowy, name="tryb_serwisowy"),
     # Dawne adresy (zakladki w przegladarce)
     path("struktura/", RedirectView.as_view(pattern_name="panel:uczelnie"), name="struktura"),
     path("administracja/", RedirectView.as_view(pattern_name="panel:ustawienia"), name="administracja"),

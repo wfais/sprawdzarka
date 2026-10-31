@@ -2,7 +2,21 @@
 {% block tytul %}Ustawienia{% endblock %}
 {% block tresc %}
 <div class="naglowek"><div><h1>Ustawienia</h1>
-  <p class="podtytul">Modele oceniające, dostęp do panelu, archiwa lat akademickich, poligon do prób i bezpośredni dostęp do danych.</p></div></div>
+  <p class="podtytul">Tryb serwisowy, modele oceniające, dostęp do panelu, archiwa lat akademickich, poligon do prób i bezpośredni dostęp do danych.</p></div></div>
+
+<section class="karta" id="serwis">
+  <h2>Tryb serwisowy</h2>
+  <div class="naglowek" style="margin:0;align-items:center">
+    <p class="stan" style="margin:0"><i class="dioda {% if tryb_serwisowy %}czerwony{% else %}zielony{% endif %}" aria-hidden="true"></i>
+      {% if tryb_serwisowy %}<b>włączony:</b> linki dla studentów pokazują stronę „Przepraszamy, trwają prace serwisowe”{% else %}wyłączony: linki dla studentów działają normalnie{% endif %}</p>
+    <form method="post" action="{% url 'panel:tryb_serwisowy' %}"{% if not tryb_serwisowy %} data-potwierdz="Włączyć tryb serwisowy? Studenci nie zaakceptują zestawów, dopóki go nie wyłączysz."{% endif %}>{% csrf_token %}
+      <input type="hidden" name="wlacz" value="{% if tryb_serwisowy %}0{% else %}1{% endif %}">
+      <button type="submit"{% if not tryb_serwisowy %} class="niebezpieczny"{% endif %}>{% if tryb_serwisowy %}Wyłącz tryb serwisowy{% else %}Włącz tryb serwisowy{% endif %}</button>
+    </form>
+  </div>
+  <p class="drugie male" style="margin:10px 0 0">Panel prowadzącego, robot i powiadomienia GitHub działają w tym czasie normalnie,
+    a zmiany wysłane przez studentów liczą się według czasu wysłania.</p>
+</section>
 
 <section class="karta" id="modele">
   <h2>Modele oceniające</h2>

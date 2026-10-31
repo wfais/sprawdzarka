@@ -98,23 +98,20 @@ h1 a:hover, h2 a:hover, h3 a:hover { color: var(--akcent); text-decoration: none
 p { margin: 0 0 10px; }
 
 /* --- Diody --- */
-.dioda { --led: var(--led-niebieski); display: inline-block; flex: none; width: 15px; height: 7px; vertical-align: 1px;
-  background: linear-gradient(color-mix(in srgb, var(--led) 45%, #fff) 0%, var(--led) 38%, var(--led) 68%,
-              color-mix(in srgb, var(--led) 70%, #000) 100%);
-  box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 6px 1px color-mix(in srgb, var(--led) 75%, transparent),
-              0 0 14px 3px color-mix(in srgb, var(--led) 32%, transparent); }
+/* Dioda: maly prostokatny wskaznik jak w sprzecie audio, bez ramki, z lekka poswiata */
+.dioda { --led: var(--led-niebieski); display: inline-block; flex: none; width: 12px; height: 5px; vertical-align: 2px;
+  background: linear-gradient(color-mix(in srgb, var(--led) 75%, #fff), var(--led) 50%, color-mix(in srgb, var(--led) 85%, #000));
+  box-shadow: 0 0 4px color-mix(in srgb, var(--led) 45%, transparent); }
 .dioda.zielony { --led: var(--led-zielony); }
 .dioda.niebieski { --led: var(--led-niebieski); }
 .dioda.zolty { --led: var(--led-zolty); }
 .dioda.pomaranczowy { --led: var(--led-pomaranczowy); }
 .dioda.czerwony { --led: var(--led-czerwony); }
 .dioda.fiolet { --led: var(--led-fiolet); }
-.dioda.wylaczona { background: linear-gradient(#aeb6bd 0%, #79838c 45%, #4f5862 100%);
-  box-shadow: 0 0 0 1.5px var(--oprawka), inset 0 1px 2px rgba(0, 0, 0, .35); }
+.dioda.wylaczona { background: linear-gradient(#b9c0c6, #8f99a2); box-shadow: none; }
 .dioda.pulsuje { animation: puls 1.8s ease-in-out infinite; }
 @keyframes puls {
-  50% { box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 8px 2px color-mix(in srgb, var(--led) 90%, transparent),
-                    0 0 20px 6px color-mix(in srgb, var(--led) 45%, transparent); }
+  50% { box-shadow: 0 0 7px 1px color-mix(in srgb, var(--led) 75%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .dioda.pulsuje { animation: none; } }
 
@@ -179,6 +176,8 @@ details.rozwijana > summary::after { content: "+"; font: 500 20px/1 var(--czcion
 details.rozwijana[open] > summary::after { content: "\2212"; }
 details.rozwijana[open] > summary { margin-bottom: 14px; }
 .tabela-oceny td { vertical-align: top; }
+.separator-licznikow { width: 1px; align-self: stretch; background: var(--linia-mocna); margin: 2px 6px; }
+.kolumna-oceny { width: 1%; white-space: nowrap; }
 .tabela-oceny .stan-zestawu { margin-top: 1px; }
 
 /* Sekcje roku na pulpicie */
@@ -310,12 +309,12 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--akcent-tlo)
 .komunikaty { list-style: none; padding: 0; margin: 0 0 18px; }
 .komunikaty li { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-radius: var(--promien); margin-bottom: 6px;
   background: var(--karta); border: 1px solid var(--linia); }
-.komunikaty li::before { content: ""; flex: none; width: 13px; height: 6px; transform: translateY(-2px);
-  background: var(--led-niebieski); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-niebieski); }
-.komunikaty li.success::before { background: var(--led-zielony); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-zielony); }
-.komunikaty li.warning::before { background: var(--led-zolty); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-zolty); }
+.komunikaty li::before { content: ""; flex: none; width: 12px; height: 5px; transform: translateY(-2px);
+  background: var(--led-niebieski); box-shadow: 0 0 4px var(--led-niebieski); }
+.komunikaty li.success::before { background: var(--led-zielony); box-shadow: 0 0 4px var(--led-zielony); }
+.komunikaty li.warning::before { background: var(--led-zolty); box-shadow: 0 0 4px var(--led-zolty); }
 .komunikaty li.error { border-color: color-mix(in srgb, var(--led-czerwony) 40%, var(--linia)); }
-.komunikaty li.error::before { background: var(--led-czerwony); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-czerwony); }
+.komunikaty li.error::before { background: var(--led-czerwony); box-shadow: 0 0 4px var(--led-czerwony); }
 
 .kopiuj { display: flex; gap: 6px; align-items: center; }
 .kopiuj input { font-family: var(--mono); font-size: 13px; }

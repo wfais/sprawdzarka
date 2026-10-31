@@ -9,7 +9,7 @@
 </head>
 <body>
 <header class="pasek">
-  <a class="logo" href="{% url 'panel:pulpit' %}"><i class="dioda zielony" aria-hidden="true"></i>Sprawdzarka</a>
+  <a class="logo" href="{% url 'panel:pulpit' %}"><i class="dioda {% if tryb_serwisowy %}czerwony{% else %}zielony{% endif %}" aria-hidden="true"{% if tryb_serwisowy %} title="Tryb serwisowy: linki dla studentów pokazują stronę o pracach serwisowych"{% endif %}></i>Sprawdzarka</a>
   {% if user.is_authenticated %}
   <nav>
     {% with s=sekcja_panelu %}

@@ -442,3 +442,61 @@ def test_po_terminie_ostatecznym_link_nie_przyjmuje_od_razu(client, github, przy
     assert "nie przyjmuje już zgłoszeń" in client.get(f"/z/{przydzial.token}/").content.decode()
     przydzial.refresh_from_db()
     assert not przydzial.otwarty and przydzial.zamkniety_po_terminie
+
+
+@pytest.mark.django_db
+def test_licznik_oceniono_i_jego_dioda(client, github, prowadzacy, przydzial):
+    from kurs import uslugi
+    z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+    z2 = uslugi.akceptuj(przydzial, 78, "ewal", "Ewa Lis")
+    adres = f"/panel/przydzialy/{przydzial.pk}/"
+
+    def licznik():
+        strona = client.get(adres).content.decode()
+        poczatek = strona.index("?stan=oceniono")
+        return strona[poczatek:strona.index("</a>", poczatek)]
+
+    # Przed terminem ostatecznym szara, prace bez kodu tez sa do oceny
+    assert "dioda wylaczona" in licznik() and "<b>0/2</b> oceniono" in licznik()
+    assert "> do oceny<" not in client.get(adres).content.decode()
+    teraz = timezone.now()
+    Przydzial.objects.filter(pk=przydzial.pk).update(termin_miekki=teraz - timedelta(days=9),
+                                                     termin_twardy=teraz - timedelta(days=2))
+    assert "dioda czerwony" in licznik()
+    Zgloszenie.objects.filter(pk=z1.pk).update(punkty=Decimal("0"), mnoznik=Decimal("0"), pr_zamkniety=True)
+    assert "dioda fiolet" in licznik() and "<b>1/2</b>" in licznik()
+    Zgloszenie.objects.filter(pk=z2.pk).update(punkty=Decimal("4"), mnoznik=Decimal("1"), pr_zamkniety=True)
+    assert "dioda zielony" in licznik() and "<b>2/2</b>" in licznik()
+    strona = client.get(adres + "?stan=oceniono").content.decode()
+    assert "Jan Kowalski" in strona and "Ewa Lis" in strona
+
+
+@pytest.mark.django_db
+def test_mnoznik_widoczny_takze_bez_kodu(github, przydzial):
+    from kurs import uslugi
+    z = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+    assert z.mnoznik_biezacy == Decimal(1)  # przed terminem
+    teraz = timezone.now()
+    Przydzial.objects.filter(pk=przydzial.pk).update(termin_miekki=teraz - timedelta(days=1),
+                                                     termin_twardy=teraz + timedelta(days=6))
+    z.refresh_from_db()
+    assert z.mnoznik_biezacy == Decimal("0.8")  # w czasie na spoznienia
+    Przydzial.objects.filter(pk=przydzial.pk).update(termin_twardy=teraz - timedelta(hours=1))
+    z = Zgloszenie.objects.get(pk=z.pk)
+    assert z.mnoznik_biezacy == Decimal(0)  # po terminie ostatecznym bez kodu
+    Zgloszenie.objects.filter(pk=z.pk).update(mnoznik=Decimal("0.5"))
+    assert Zgloszenie.objects.get(pk=z.pk).mnoznik_biezacy == Decimal("0.5")  # decyzja prowadzacego
+
+
+@pytest.mark.django_db
+def test_tryb_serwisowy(client, github, prowadzacy, przydzial):
+    assert "dioda zielony" in client.get("/panel/").content.decode()
+    client.post("/panel/ustawienia/tryb-serwisowy/", {"wlacz": "1"})
+    panel = client.get("/panel/").content.decode()
+    assert 'class="dioda czerwony"' in panel[:panel.index("</header>")]
+    zaloguj_studenta(client)
+    odp = client.get(f"/z/{przydzial.token}/")
+    assert odp.status_code == 503 and "trwają prace serwisowe" in odp.content.decode()
+    client.post("/panel/ustawienia/tryb-serwisowy/", {"wlacz": "0"})
+    odp = client.get(f"/z/{przydzial.token}/")
+    assert odp.status_code == 200 and "trwają prace serwisowe" not in odp.content.decode()

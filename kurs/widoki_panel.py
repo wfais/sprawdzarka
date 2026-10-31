@@ -26,7 +26,7 @@ from .forms import (
     FormularzPrzydzialu, FormularzRoku, FormularzUczelni, FormularzWyjatku, FormularzZestawu,
 )
 from .models import (
-    Ewaluacja, Grupa, KontoProwadzacego, Kurs, NieudaneLogowanie, Poprawka, Precedens, Przydzial, Rok, Student, Uczelnia, Wypchniecie, Zestaw, Zgloszenie,
+    Ewaluacja, Grupa, KontoProwadzacego, UstawieniaSerwisu, Kurs, NieudaneLogowanie, Poprawka, Precedens, Przydzial, Rok, Student, Uczelnia, Wypchniecie, Zestaw, Zgloszenie,
 )
 
 log = logging.getLogger(__name__)
@@ -34,29 +34,48 @@ log = logging.getLogger(__name__)
 prowadzacy = user_passes_test(lambda u: u.is_active and u.is_staff, login_url="panel:logowanie")
 
 def _dolacz_liczniki(przydzialy):
-    """Dopisuje do kazdego przydzialu liczniki stanow prac (diody), liczbe prac do oceny i stan zestawu."""
+    """Dopisuje do kazdego przydzialu liczniki stanow prac (diody), oceny i stan zestawu.
+
+    Do oceny sa wszystkie zaakceptowane prace z repozytorium (takze bez kodu: te dostaja 0 pkt);
+    ocenione to prace z wystawiona ocena. Ocena automatyczna dotyczy tylko prac z oddanym kodem."""
     przydzialy = list(przydzialy)
     mapa = {p.pk: p for p in przydzialy}
     teraz = timezone.now()
     for p in przydzialy:
         p.liczniki = {s.klucz: 0 for s in stany.PRACE}
-        p.lacznie = p.testy = p.do_oceny = 0
+        p.lacznie = p.testy = p.do_oceny = p.ocenione = p.do_oceny_automatycznej = 0
     wiersze = (
         Zgloszenie.objects.filter(przydzial_id__in=mapa).exclude(status=Zgloszenie.Status.WYZEROWANE)
         .values_list("przydzial_id", "status", "stan_kolor", "sugerowany_mnoznik", "wyjatek_termin_miekki",
-                     "testy_zmienione", "pr_zamkniety", "sha_oceniany")
+                     "testy_zmienione", "pr_zamkniety", "sha_oceniany", "punkty")
     )
-    for pk, status, kolor, mnoznik, wyjatek, testy, zamkniety, sha in wiersze:
+    for pk, status, kolor, mnoznik, wyjatek, testy, zamkniety, sha, punkty in wiersze:
         p = mapa[pk]
         p.liczniki[stany.praca(status, kolor, mnoznik, wyjatek or p.termin_miekki, teraz).klucz] += 1
         p.lacznie += 1
         p.testy += bool(testy)
-        if status == Zgloszenie.Status.GOTOWE and sha and not zamkniety:
+        if status != Zgloszenie.Status.GOTOWE:
+            continue
+        if zamkniety or punkty is not None:
+            p.ocenione += 1
+        else:
             p.do_oceny += 1
+            p.do_oceny_automatycznej += bool(sha)
     for p in przydzialy:
         p.paski = [(s, p.liczniki[s.klucz]) for s in stany.PRACE if p.liczniki[s.klucz]]
         p.stan = stany.zestaw(p.publikacja, p.termin_miekki, p.termin_twardy, teraz, p.do_oceny)
+        p.do_ocenienia = p.ocenione + p.do_oceny
+        p.dioda_ocen = _dioda_ocen(p, teraz)
     return przydzialy
+
+
+def _dioda_ocen(p, teraz) -> str:
+    """Szara przed terminem ostatecznym; po nim czerwona (nic nie ocenione), fioletowa (czesc), zielona (wszystko)."""
+    if teraz <= p.termin_twardy or not p.do_ocenienia:
+        return "wylaczona"
+    if not p.ocenione:
+        return "czerwony"
+    return "zielony" if p.ocenione == p.do_ocenienia else "fiolet"
 
 
 def _zadan(n: int) -> str:
@@ -578,6 +597,19 @@ def _do_ustawien(kotwica: str):
 
 @prowadzacy
 @require_POST
+def tryb_serwisowy(request):
+    ustawienia = UstawieniaSerwisu.biezace()
+    ustawienia.tryb_serwisowy = request.POST.get("wlacz") == "1"
+    ustawienia.save()
+    if ustawienia.tryb_serwisowy:
+        messages.warning(request, "Tryb serwisowy włączony: linki dla studentów pokazują stronę o pracach serwisowych.")
+    else:
+        messages.success(request, "Tryb serwisowy wyłączony: linki dla studentów działają normalnie.")
+    return _do_ustawien("#serwis")
+
+
+@prowadzacy
+@require_POST
 def wczytaj_archiwum(request):
     formularz = FormularzImportu(request.POST, request.FILES)
     if not formularz.is_valid():
@@ -801,8 +833,9 @@ def przydzial(request, pk):
     if filtr == "testy":
         widoczne = [z for z in zgloszenia if z.testy_zmienione]
     elif filtr == "do_oceny":
-        widoczne = [z for z in zgloszenia if z.status == Zgloszenie.Status.GOTOWE and z.sha_oceniany
-                    and not z.pr_zamkniety]
+        widoczne = [z for z in zgloszenia if z.status == Zgloszenie.Status.GOTOWE and not z.oceniona]
+    elif filtr == "oceniono":
+        widoczne = [z for z in zgloszenia if z.status == Zgloszenie.Status.GOTOWE and z.oceniona]
     elif filtr:
         widoczne = [z for z in zgloszenia if z.stan_pracy.klucz == filtr]
     else:
@@ -1458,7 +1491,7 @@ _W_TOKU = {Ewaluacja.Status.OCZEKUJE, Ewaluacja.Status.TESTY, Ewaluacja.Status.M
 
 def _przydzialy_do_oceny():
     """Zestawy w grupach z oddanymi pracami (z lat i przedmiotow widocznych na pulpicie):
-    ocena automatyczna aktualnej wersji kodu, prace do decyzji prowadzacego i wyslane oceny."""
+    ocena automatyczna aktualnej wersji kodu i wystawione oceny."""
     przydzialy = [p for p in _dolacz_liczniki(
         Przydzial.objects.filter(zestaw__kurs__ukryty=False, zestaw__kurs__rok__ukryty=False,
                                  zestaw__kurs__rok__zarchiwizowany=False)
@@ -1466,10 +1499,7 @@ def _przydzialy_do_oceny():
     mapa = {p.pk: p for p in przydzialy}
     for p in przydzialy:
         p.automatyczne = dict.fromkeys(_STAN_OCENY, 0)
-        p.wyslane = 0
     aktywne = Zgloszenie.objects.filter(przydzial_id__in=mapa).exclude(status=Zgloszenie.Status.WYZEROWANE)
-    for pk, zamkniety in aktywne.values_list("przydzial_id", "pr_zamkniety"):
-        mapa[pk].wyslane += zamkniety
     najlepsze = {}
     for zgl, pk, status in (Ewaluacja.objects.filter(zgloszenie__in=aktywne, sha=F("zgloszenie__sha_oceniany"))
                             .values_list("zgloszenie_id", "zgloszenie__przydzial_id", "status")):
@@ -1478,7 +1508,8 @@ def _przydzialy_do_oceny():
             najlepsze[zgl] = (pk, stan)
     for pk, stan in najlepsze.values():
         mapa[pk].automatyczne[stan] += 1
-    przydzialy.sort(key=lambda p: (p.do_oceny == 0, p.zestaw.kurs.rok.poligon, p.termin_twardy))
+    przydzialy.sort(key=lambda p: (p.dioda_ocen != "czerwony" and p.dioda_ocen != "fiolet", p.zestaw.kurs.rok.poligon,
+                                   p.termin_twardy))
     return przydzialy
 
 
