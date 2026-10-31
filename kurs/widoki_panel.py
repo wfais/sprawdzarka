@@ -992,6 +992,8 @@ def przydzial_poprawka(request, pk):
         return redirect("panel:przydzial_poprawka", pk=pk)
     return render(request, "kurs/panel/poprawka_nowa.html", {
         "przydzial": przydzial, "pliki": pliki, "historia": historia, "trwa": trwa,
+        "roznice": poprawki.roznice(przydzial, pliki) if pliki else [],
+        "pominietych": max(len(pliki) - poprawki.MAKS_PLIKOW_PODGLADU, 0),
         "studentow": przydzial.zgloszenia.filter(status=Zgloszenie.Status.GOTOWE).count(),
     })
 

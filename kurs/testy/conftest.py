@@ -71,6 +71,7 @@ class FalszywyGitHub:
         self.chronione = []
         self.blad_zamkniecia = None
         self.drzewa = {}
+        self.bloby = {}                 # sha -> tresc pliku (podglad poprawki)
         self.nowy_start = "e" * 40      # wynik poprawki stanu startowego (None: brak zmian)
         self.wyniki_scalenia = {}       # repozytorium -> WynikScalenia
         self.scalenia = []
@@ -123,6 +124,9 @@ class FalszywyGitHub:
         self.scalenia.append((cel, sha_poprawki, galaz_poprawki, autoscalanie))
         domyslny = WynikScalenia(True, "m" * 40) if autoscalanie else WynikScalenia(False)
         return self.wyniki_scalenia.get(cel, domyslny)
+
+    def tresc_bloba(self, pelna, sha):
+        return self.bloby.get(sha, b"")
 
     def drzewo_blobow(self, pelna, sha):
         if sha not in self.drzewa:
@@ -202,7 +206,7 @@ FUNKCJE_KLIENTA = [
     "adres_webhooka", "zdarzenia_aplikacji", "dostawy_webhookow", "dostep_studenta",
     "komentarz_pr", "zamknij_pr", "odbierz_dostep", "zmien_nazwe", "archiwizuj", "usun_repo",
     "pobierz_archiwum", "drzewo_plikow", "recenzja_pr", "chron_galaz", "drzewo_blobow",
-    "sha_galezi", "zezwol_aplikacji_na_galaz", "czy_zawiera",
+    "sha_galezi", "zezwol_aplikacji_na_galaz", "czy_zawiera", "tresc_bloba",
 ]
 FUNKCJE_GIT = ["migawka_startowa", "przygotuj_repo_studenta", "poprawka_startowa", "scal_poprawke"]
 

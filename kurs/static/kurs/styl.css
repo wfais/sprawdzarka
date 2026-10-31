@@ -362,6 +362,17 @@ details summary { cursor: pointer; color: var(--drugi); }
 .terminy-przydzialu { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 6px 0 6px; font-size: 14.5px; color: var(--drugi); }
 .terminy-przydzialu b { color: var(--tekst); font-weight: 600; }
 
+/* --- Podglad poprawki ze zrodla: roznice w plikach --- */
+.roznica-pliku { padding: 8px 0; border-top: 1px solid var(--linia); }
+.roznica-pliku:first-of-type { border-top: none; }
+.roznica-pliku > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--tekst); }
+.roznica { margin: 8px 0 0; padding: 6px 0; background: var(--karta-2); border: 1px solid var(--linia);
+  font: 12.5px/1.45 var(--mono); overflow-x: auto; white-space: pre; max-height: 520px; }
+.roznica span { display: block; padding: 0 12px; min-width: max-content; }
+.roznica .dodany { background: var(--zielony-tlo); color: var(--zielony); }
+.roznica .usuniety { background: var(--czerwony-tlo); color: var(--czerwony); }
+.roznica .fragment { color: var(--slaby); }
+
 /* --- Pomoc przy terminach --- */
 .pomoc-terminu { margin-top: 6px; }
 label.pomoc-terminu { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--drugi); font-weight: 400; cursor: pointer; }

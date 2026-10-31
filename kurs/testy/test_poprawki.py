@@ -128,8 +128,12 @@ def test_stare_wersje_testow_nie_sa_zmiana_studenta(tmp_path):
 def test_strony_poprawki(client, github, prowadzacy, przydzial):
     ewa, jan, _ = _studenci(przydzial)
     github.drzewa = {przydzial.sha_startowy: {"README.md": "1"}, "zrodlo-wfais/python-zestaw3": {"README.md": "2"}}
+    github.bloby = {"1": "# Zestaw\nstara linia\n".encode(), "2": "# Zestaw\nnowa linia\n".encode()}
     strona = client.get(f"/panel/przydzialy/{przydzial.pk}/poprawka/")
-    assert strona.status_code == 200 and "README.md" in strona.content.decode()
+    tresc = strona.content.decode()
+    assert strona.status_code == 200 and "README.md" in tresc and "nic nie zostało jeszcze zmienione" in tresc
+    assert '<span class="usuniety">-stara linia</span>' in tresc and '<span class="dodany">+nowa linia</span>' in tresc
+    assert not Poprawka.objects.exists()  # samo otwarcie niczego nie zmienia
     odp = client.post(f"/panel/przydzialy/{przydzial.pk}/poprawka/", {"opis": "Nowy opis", "autoscalanie": "1"})
     poprawka = Poprawka.objects.get()
     assert odp.status_code == 302 and odp["Location"].endswith(f"/panel/poprawki/{poprawka.pk}/")
@@ -150,3 +154,11 @@ def test_strona_studenta_informuje_o_poprawce(client, github, przydzial):
     zaloguj_studenta(client, 401, "kasia")
     strona = client.get(f"/z/{przydzial.token}/").content.decode()
     assert "Poprawka prowadzącego nr 1" in strona and "/pull/" in strona
+
+
+@pytest.mark.django_db
+def test_podglad_bez_zmian_niczego_nie_zleca(client, github, prowadzacy, przydzial):
+    github.drzewa = {przydzial.sha_startowy: {"README.md": "1"}, "zrodlo-wfais/python-zestaw3": {"README.md": "1"}}
+    tresc = client.get(f"/panel/przydzialy/{przydzial.pk}/poprawka/").content.decode()
+    assert "Brak zmian" in tresc and "nic nie zostało zmienione" in tresc and "Zatwierdzam" not in tresc
+    assert not Poprawka.objects.exists()

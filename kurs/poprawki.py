@@ -10,6 +10,7 @@ Przebieg jednej poprawki:
 """
 from __future__ import annotations
 
+import difflib
 import logging
 from datetime import timedelta
 
@@ -40,6 +41,64 @@ def podglad(przydzial: Przydzial) -> list[dict]:
             continue
         rodzaj = "dodany" if sciezka not in stare else ("usunięty" if sciezka not in nowe else "zmieniony")
         wynik.append({"sciezka": sciezka, "rodzaj": rodzaj})
+    return wynik
+
+
+MAKS_ROZMIAR_PODGLADU = 200_000  # bajtow na plik
+MAKS_WIERSZY_PODGLADU = 400       # wierszy roznicy na plik
+MAKS_PLIKOW_PODGLADU = 40
+
+
+class _BezPodgladu(Exception):
+    pass
+
+
+def _tekst(repo: str, sha) -> str:
+    if not sha:
+        return ""
+    dane = gh.tresc_bloba(repo, sha)
+    if len(dane) > MAKS_ROZMIAR_PODGLADU:
+        raise _BezPodgladu("Duży plik: podgląd pominięty.")
+    try:
+        return dane.decode("utf-8")
+    except UnicodeDecodeError:
+        raise _BezPodgladu("Plik binarny: podgląd pominięty.") from None
+
+
+def roznice(przydzial: Przydzial, pliki: list) -> list[dict]:
+    """Zmiany w tresci plikow wzgledem stanu startowego grupy, tylko do obejrzenia przed zatwierdzeniem poprawki.
+    Kazdy wpis: sciezka, rodzaj, dodane, usuniete, wiersze [(rodzaj wiersza, tekst)], uwaga."""
+    nowe = gh.drzewo_blobow(przydzial.zrodlo, gh.sha_galezi(przydzial.zrodlo))
+    stare = gh.drzewo_blobow(przydzial.repo_startowe, przydzial.sha_startowy)
+    wynik = []
+    for plik in pliki[:MAKS_PLIKOW_PODGLADU]:
+        sciezka = plik["sciezka"]
+        wpis = {**plik, "dodane": 0, "usuniete": 0, "wiersze": [], "uwaga": ""}
+        try:
+            przed = _tekst(przydzial.repo_startowe, stare.get(sciezka))
+            po = _tekst(przydzial.zrodlo, nowe.get(sciezka))
+        except _BezPodgladu as powod:
+            wpis["uwaga"] = str(powod)
+        except gh.BladGitHub as blad:
+            wpis["uwaga"] = f"Nie udało się pobrać treści: {blad}"
+        else:
+            roznica = list(difflib.unified_diff(przed.splitlines(), po.splitlines(), lineterm="", n=3))[2:]
+            for wiersz in roznica:
+                if wiersz.startswith("@@"):
+                    rodzaj = "fragment"
+                elif wiersz.startswith("+"):
+                    rodzaj, wpis["dodane"] = "dodany", wpis["dodane"] + 1
+                elif wiersz.startswith("-"):
+                    rodzaj, wpis["usuniete"] = "usuniety", wpis["usuniete"] + 1
+                else:
+                    rodzaj = ""
+                if len(wpis["wiersze"]) < MAKS_WIERSZY_PODGLADU:
+                    wpis["wiersze"].append((rodzaj, wiersz))
+            if len(roznica) > MAKS_WIERSZY_PODGLADU:
+                wpis["uwaga"] = f"Pokazano {MAKS_WIERSZY_PODGLADU} z {len(roznica)} wierszy różnicy."
+            elif not roznica:
+                wpis["uwaga"] = "Zmienione tylko końce wierszy albo kodowanie."
+        wynik.append(wpis)
     return wynik
 
 

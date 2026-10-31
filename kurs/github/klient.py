@@ -270,6 +270,15 @@ def drzewo_blobow(pelna: str, sha: str) -> dict:
     return {w["path"]: w["sha"] for w in dane.get("tree", []) if w.get("type") == "blob"}
 
 
+@functools.lru_cache(maxsize=256)
+def tresc_bloba(pelna: str, sha: str) -> bytes:
+    """Tresc pliku o danym skrocie (niezmienna dla danego sha)."""
+    dane = zapytanie("GET", f"/repos/{pelna}/git/blobs/{sha}") or {}
+    if dane.get("encoding") == "base64":
+        return base64.b64decode(dane.get("content", ""))
+    return (dane.get("content") or "").encode()
+
+
 def porownaj(pelna: str, sha_od: str, sha_do: str) -> list[str]:
     """Sciezki plikow, ktorych zawartosc rozni sie miedzy dwoma stanami (bezposrednie porownanie drzew).
 
