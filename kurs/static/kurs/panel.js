@@ -205,7 +205,8 @@ document.addEventListener("click", function (zdarzenie) {
   if (edycja) edycja.open = false;
 });
 
-// Punktacja koncowa (punkty razy mnoznik) liczona na biezaco; Resetuj ustawia mnoznik wedlug terminow studenta
+// Punktacja koncowa (punkty razy mnoznik) liczona na biezaco. Mnoznik wpisany recznie trzeba przyjac
+// przyciskiem Ustaw (tylko liczba od 0 do 1); Resetuj ustawia mnoznik wedlug terminow studenta.
 (function () {
   function liczba(tekst) {
     var t = (tekst || "").trim().replace(",", ".");
@@ -214,27 +215,92 @@ document.addEventListener("click", function (zdarzenie) {
   function pokaz(x) {
     return String(Math.round(x * 100 + 1e-9) / 100).replace(".", ",");
   }
-  document.querySelectorAll("form [data-wynik]").forEach(function (wynik) {
-    var formularz = wynik.closest("form");
-    function przelicz() {
-      var punkty = formularz.querySelectorAll("[data-punkty]");
-      var mnoznik = liczba((formularz.querySelector("[data-mnoznik]") || {}).value);
-      var suma = 0, pelne = punkty.length > 0;
-      punkty.forEach(function (pole) {
-        var v = liczba(pole.value);
-        if (v === null) pelne = false; else suma += v;
-      });
-      wynik.textContent = pelne && mnoznik !== null ? pokaz(suma * mnoznik) : "-";
+  function czesci(formularz) {
+    var pole = formularz.querySelector("[data-mnoznik]");
+    return {
+      pole: pole,
+      przycisk: formularz.querySelector("[data-resetuj-mnoznik]"),
+      blad: formularz.querySelector("[data-blad-mnoznika]"),
+      wynik: formularz.querySelector("[data-wynik]"),
+    };
+  }
+  function oczekuje(c) {
+    return c.pole.value !== c.pole.dataset.ustawiony;
+  }
+  function przelicz(formularz) {
+    var c = czesci(formularz);
+    if (!c.wynik) return;
+    var mnoznik = liczba(c.pole.dataset.ustawiony);
+    var suma = 0, pelne = true, punkty = formularz.querySelectorAll("[data-punkty]");
+    if (!punkty.length) pelne = false;
+    punkty.forEach(function (pole) {
+      var v = liczba(pole.value);
+      if (v === null) pelne = false; else suma += v;
+    });
+    c.wynik.textContent = pelne && mnoznik !== null ? pokaz(suma * mnoznik) : "-";
+  }
+  function pokazBlad(c, tekst) {
+    c.pole.classList.toggle("blad-pola", !!tekst);
+    if (c.blad) { c.blad.textContent = tekst || ""; c.blad.hidden = !tekst; }
+  }
+  function trybPrzycisku(c) {
+    var ustaw = oczekuje(c);
+    c.przycisk.textContent = ustaw ? "Ustaw" : "Resetuj";
+    c.przycisk.classList.toggle("glowny", ustaw);
+    c.przycisk.title = ustaw ? "Przyjmuje wpisany mnożnik (liczba od 0 do 1)"
+      : "Ustawia mnożnik według terminów studenta: " + c.przycisk.getAttribute("data-resetuj-mnoznik");
+  }
+  function ustaw(c, wartosc) {
+    c.pole.value = wartosc;
+    c.pole.dataset.ustawiony = wartosc;
+    pokazBlad(c, "");
+    trybPrzycisku(c);
+    przelicz(c.pole.form);
+  }
+  function kliknij(c) {
+    if (!oczekuje(c)) {
+      ustaw(c, c.przycisk.getAttribute("data-resetuj-mnoznik"));
+      return;
     }
-    formularz.addEventListener("input", przelicz);
-    przelicz();
+    var v = liczba(c.pole.value);
+    if (v === null || v > 1) {
+      pokazBlad(c, "Mnożnik musi być liczbą od 0 do 1.");
+      c.pole.focus();
+      return;
+    }
+    ustaw(c, pokaz(v));
+  }
+
+  document.querySelectorAll("form [data-mnoznik]").forEach(function (pole) {
+    var formularz = pole.form;
+    var c = czesci(formularz);
+    if (!c.przycisk) return;
+    pole.dataset.ustawiony = pole.value;
+    pole.addEventListener("input", function () {
+      // Dozwolone tylko cyfry i jeden separator dziesietny
+      var czyste = pole.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1");
+      if (czyste !== pole.value) pole.value = czyste;
+      pokazBlad(c, "");
+      trybPrzycisku(c);
+    });
+    pole.addEventListener("keydown", function (zdarzenie) {
+      if (zdarzenie.key === "Enter") { zdarzenie.preventDefault(); kliknij(c); }
+    });
+    c.przycisk.addEventListener("click", function () { kliknij(c); });
+    formularz.addEventListener("input", function () { przelicz(formularz); });
+    trybPrzycisku(c);
+    przelicz(formularz);
   });
-  document.addEventListener("click", function (zdarzenie) {
-    var przycisk = zdarzenie.target.closest("[data-resetuj-mnoznik]");
-    if (!przycisk || !przycisk.form) return;
-    var pole = przycisk.form.querySelector("[data-mnoznik]");
-    if (!pole) return;
-    pole.value = przycisk.getAttribute("data-resetuj-mnoznik");
-    pole.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+
+  // Wyslanie z nieprzyjetym mnoznikiem jest wstrzymane (przed potwierdzeniem i blokada przyciskow)
+  document.addEventListener("submit", function (zdarzenie) {
+    var pole = zdarzenie.target.querySelector && zdarzenie.target.querySelector("[data-mnoznik]");
+    if (!pole || pole.dataset.ustawiony === undefined) return;
+    var c = czesci(zdarzenie.target);
+    if (!oczekuje(c)) return;
+    zdarzenie.preventDefault();
+    zdarzenie.stopPropagation();
+    pokazBlad(c, "Przyjmij mnożnik przyciskiem Ustaw albo przywróć go przyciskiem Resetuj.");
+    pole.focus();
+  }, true);
 })();

@@ -294,12 +294,15 @@ details.edycja[open] > summary { display: none; }
 .podglad-edycji .slabe.male { margin-left: 4px; }
 .podglad-edycji div.slabe.male { margin-left: 0; }
 /* Punkty, mnoznik z Resetuj i punktacja koncowa w jednym wierszu */
-.wiersz-punktacji { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 28px; }
+.wiersz-punktacji { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 28px; }
 .formularz > .wiersz-punktacji { margin-bottom: 14px; }
 .wiersz-punktacji input[type=text], .wiersz-punktacji input:not([type]) { width: 120px; }
 .wiersz-punktacji input[data-mnoznik] { width: 90px; }
 .pole-z-przyciskiem { display: flex; align-items: center; gap: 8px; }
-.punktacja-koncowa { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; }
+.pole-z-przyciskiem button { min-width: 74px; justify-content: center; }
+input.blad-pola, input.blad-pola:focus { border-color: var(--czerwony); box-shadow: 0 0 0 3px color-mix(in srgb, var(--czerwony) 18%, transparent); }
+.blad-mnoznika { color: var(--czerwony); font-size: 13px; margin-top: 4px; max-width: 260px; }
+.punktacja-koncowa { display: flex; flex-direction: column; gap: 6px; }
 .punktacja-koncowa .etykieta { font-size: 14px; font-weight: 500; }
 .punktacja-koncowa strong { font-size: 20px; font-variant-numeric: tabular-nums; }
 .wiersz-punktacji .pelna-szerokosc { flex-basis: 100%; margin-top: 0; }
