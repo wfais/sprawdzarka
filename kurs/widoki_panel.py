@@ -2,6 +2,7 @@
 import logging
 import secrets
 from datetime import timedelta
+from decimal import Decimal
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -1079,7 +1080,7 @@ def _podsumowanie_testow(ewaluacja):
 @prowadzacy
 def zgloszenie(request, pk):
     zgl = _zgloszenie(pk)
-    mnoznik = zgl.mnoznik if zgl.mnoznik is not None else (zgl.sugerowany_mnoznik if zgl.sugerowany_mnoznik is not None else 1)
+    mnoznik = zgl.mnoznik if zgl.mnoznik is not None else zgl.mnoznik_z_terminow
     formularz_oceny = FormularzOceny(
         punkty_max=zgl.przydzial.zestaw.punkty_max,
         initial={"punkty": zgl.punkty, "mnoznik": mnoznik, "komentarz": zgl.komentarz_koncowy},
@@ -1095,6 +1096,8 @@ def zgloszenie(request, pk):
         "wiersze": wiersze,
         "liczba_ewaluacji": zgl.ewaluacje.count(),
         "mnoznik_domyslny": mnoznik,
+        "mnoznik_z_terminow": zgl.mnoznik_z_terminow,
+        "mnoznik_spoznienia": Decimal(settings.SPRAWDZARKA_MNOZNIK_SPOZNIENIA),
         "opinie": ewaluacja.opinie.all() if ewaluacja else [],
         "testy": _podsumowanie_testow(ewaluacja),
         "ocena_nieaktualna": bool(

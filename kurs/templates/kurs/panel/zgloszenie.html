@@ -63,7 +63,11 @@
       {% endif %}
       <form method="post" action="{% url 'panel:zgloszenie_ocena' z.pk %}" class="formularz"
             data-potwierdz="Wysłać ocenę do pull requestu i zamknąć go?">{% csrf_token %}
-        {{ formularz_oceny.as_div }}
+        <div class="wiersz-punktacji">
+          <div>{{ formularz_oceny.punkty.label_tag }}{{ formularz_oceny.punkty }}</div>
+          {% include "kurs/panel/_mnoznik_i_punktacja.html" with pole_mnoznika=formularz_oceny.mnoznik %}
+        </div>
+        {{ formularz_oceny.komentarz.as_field_group }}
         <div class="przyciski">
           <button class="glowny" type="submit" data-czekaj="Wysyłam">Zamknij z oceną</button>
           <button type="submit" name="nastepny" value="przydzial" data-czekaj="Wysyłam">Zamknij i wróć do listy</button>

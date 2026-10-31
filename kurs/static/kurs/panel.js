@@ -204,3 +204,37 @@ document.addEventListener("click", function (zdarzenie) {
   if (przycisk.form) przycisk.form.reset();
   if (edycja) edycja.open = false;
 });
+
+// Punktacja koncowa (punkty razy mnoznik) liczona na biezaco; Resetuj ustawia mnoznik wedlug terminow studenta
+(function () {
+  function liczba(tekst) {
+    var t = (tekst || "").trim().replace(",", ".");
+    return /^\d+(\.\d+)?$/.test(t) ? parseFloat(t) : null;
+  }
+  function pokaz(x) {
+    return String(Math.round(x * 100 + 1e-9) / 100).replace(".", ",");
+  }
+  document.querySelectorAll("form [data-wynik]").forEach(function (wynik) {
+    var formularz = wynik.closest("form");
+    function przelicz() {
+      var punkty = formularz.querySelectorAll("[data-punkty]");
+      var mnoznik = liczba((formularz.querySelector("[data-mnoznik]") || {}).value);
+      var suma = 0, pelne = punkty.length > 0;
+      punkty.forEach(function (pole) {
+        var v = liczba(pole.value);
+        if (v === null) pelne = false; else suma += v;
+      });
+      wynik.textContent = pelne && mnoznik !== null ? pokaz(suma * mnoznik) : "-";
+    }
+    formularz.addEventListener("input", przelicz);
+    przelicz();
+  });
+  document.addEventListener("click", function (zdarzenie) {
+    var przycisk = zdarzenie.target.closest("[data-resetuj-mnoznik]");
+    if (!przycisk || !przycisk.form) return;
+    var pole = przycisk.form.querySelector("[data-mnoznik]");
+    if (!pole) return;
+    pole.value = przycisk.getAttribute("data-resetuj-mnoznik");
+    pole.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+})();

@@ -66,7 +66,7 @@
           <td class="liczba" title="{{ k.uzasadnienie }}">{% if k.blad %}<span class="znacznik czerwony">błąd</span>{% elif k.punkty is not None %}{{ k.punkty|floatformat:"-2" }}{% if k.poprzednio is not None and k.poprzednio != k.punkty %} <span class="slabe male">(było {{ k.poprzednio|floatformat:"-2" }})</span>{% endif %}{% else %}<span class="slabe">-</span>{% endif %}</td>
           {% endfor %}
           <td class="liczba">{% if o.punkty_konsensus is not None %}{{ o.punkty_konsensus|floatformat:"-2" }}{% else %}<span class="slabe">-</span>{% endif %}</td>
-          <td class="liczba"><input type="text" inputmode="decimal" name="pkt_{{ o.pk }}" style="width:70px;text-align:right"
+          <td class="liczba"><input type="text" inputmode="decimal" name="pkt_{{ o.pk }}" data-punkty style="width:70px;text-align:right"
                 value="{% if o.punkty_koncowe is not None %}{{ o.punkty_koncowe|floatformat:'-2' }}{% endif %}"></td>
         </tr>
         <tr><td colspan="{{ modele_tabeli|length|add:4 }}" style="padding-top:0">
@@ -80,9 +80,9 @@
       </table>
       </div>
       <div class="formularz" style="margin-top:12px">
-        <div><label for="mnoznik">Mnożnik terminu</label>
-          <input id="mnoznik" type="text" inputmode="decimal" name="mnoznik" style="width:90px" value="{{ mnoznik_domyslny|floatformat:'-2' }}">
-          <span class="pomoc">Sugestia z terminów: {% if z.sugerowany_mnoznik is not None %}{{ z.sugerowany_mnoznik|floatformat:"-2" }}{% else %}brak{% endif %}.</span></div>
+        <div class="wiersz-punktacji">
+          {% include "kurs/panel/_mnoznik_i_punktacja.html" with pole_mnoznika=None %}
+        </div>
         <div><label for="komentarz-ew">Komentarz dla studenta (trafi do pull requestu)</label>
           <textarea id="komentarz-ew" name="komentarz" rows="6">{{ ewaluacja.komentarz }}</textarea></div>
         <div><label class="male"><input type="checkbox" name="uwagi" value="1"> dodaj uwagi modeli przy liniach kodu (gdy GitHub ich nie przyjmie, trafią do komentarza)</label></div>

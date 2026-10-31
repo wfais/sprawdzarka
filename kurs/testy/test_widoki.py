@@ -547,3 +547,22 @@ def test_karta_studenta_informacja_i_edycja_na_miejscu(client, github, prowadzac
     client.post(f"/panel/zgloszenia/{z.pk}/termin/", {"akcja": "przywroc"})
     z.refresh_from_db()
     assert not z.ma_wyjatek
+
+
+@pytest.mark.django_db
+def test_punktacja_mnoznik_z_resetem_wedlug_terminow_studenta(client, github, prowadzacy, przydzial):
+    from django.utils import timezone
+    from kurs import uslugi
+    z = uslugi.akceptuj(przydzial, 99, "ewa", "Ewa Lis")
+    strona = client.get(f"/panel/zgloszenia/{z.pk}/").content.decode()
+    assert ">Mnożnik:</label>" in strona and "Mnożnik terminu" not in strona
+    assert 'data-resetuj-mnoznik="1"' in strona and "Punktacja końcowa" in strona and "data-wynik" in strona
+    # Indywidualny termin juz minal, ostateczny trwa: bez oddanego kodu regula daje mnoznik spoznienia
+    teraz = timezone.now()
+    Zgloszenie.objects.filter(pk=z.pk).update(wyjatek_termin_miekki=teraz - timedelta(hours=1))
+    strona = client.get(f"/panel/zgloszenia/{z.pk}/").content.decode()
+    assert 'data-resetuj-mnoznik="0,80"' in strona
+    # Sugestia z przeliczenia (kiedy student zmienial kod) ma pierwszenstwo, decyzja prowadzacego nie zmienia reguly
+    Zgloszenie.objects.filter(pk=z.pk).update(sugerowany_mnoznik=Decimal("1"), mnoznik=Decimal("0.5"))
+    strona = client.get(f"/panel/zgloszenia/{z.pk}/").content.decode()
+    assert 'data-resetuj-mnoznik="1"' in strona and 'name="mnoznik" value="0,50"' in strona

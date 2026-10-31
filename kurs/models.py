@@ -433,6 +433,13 @@ class Zgloszenie(models.Model):
             return None
         if self.mnoznik is not None:
             return self.mnoznik
+        return self.mnoznik_z_terminow
+
+    @property
+    def mnoznik_z_terminow(self) -> Decimal:
+        """Mnoznik wedlug terminow studenta (indywidualnych albo grupy): sugestia z przeliczenia (kiedy student
+        zmienial kod: 1 w terminie, mnoznik spoznienia w czasie na spoznienia, 0 gdy kod tylko po terminie
+        ostatecznym), a bez niej wedlug chwili obecnej."""
         if self.sugerowany_mnoznik is not None:
             return self.sugerowany_mnoznik
         teraz = timezone.now()

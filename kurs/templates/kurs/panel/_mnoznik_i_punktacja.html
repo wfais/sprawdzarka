@@ -1,0 +1,15 @@
+{% comment %}Mnoznik z przyciskiem Resetuj (wedlug terminow studenta) i punktacja koncowa liczona na biezaco w przegladarce{% endcomment %}
+<div>
+  <label for="{% if pole_mnoznika %}{{ pole_mnoznika.id_for_label }}{% else %}mnoznik{% endif %}">Mnożnik:</label>
+  <div class="pole-z-przyciskiem">
+    {% if pole_mnoznika %}{{ pole_mnoznika }}{% else %}<input id="mnoznik" type="text" inputmode="decimal" name="mnoznik" data-mnoznik value="{{ mnoznik_domyslny|floatformat:'-2' }}">{% endif %}
+    <button type="button" class="maly" data-resetuj-mnoznik="{{ mnoznik_z_terminow|floatformat:'-2' }}"
+            title="Ustawia mnożnik według terminów studenta: {{ mnoznik_z_terminow|floatformat:'-2' }}">Resetuj</button>
+  </div>
+</div>
+<div class="punktacja-koncowa">
+  <span class="etykieta">Punktacja końcowa</span>
+  <span><strong data-wynik>-</strong> <span class="drugie">/ {{ z.przydzial.zestaw.punkty_max|floatformat:"-2" }}</span></span>
+</div>
+<p class="pomoc pelna-szerokosc">Resetuj ustawia mnożnik według terminów studenta (indywidualnych albo grupy): 1 w terminie,
+  {{ mnoznik_spoznienia|floatformat:"-2" }} gdy zmieniał kod w czasie na spóźnienia, 0 gdy kod jest tylko po terminie ostatecznym.</p>

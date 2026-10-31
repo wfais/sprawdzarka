@@ -401,8 +401,7 @@ class FormularzOceny(forms.Form):
         label="Punkty za rozwiązanie", min_value=0, max_digits=6, decimal_places=2, localize=True,
     )
     mnoznik = forms.DecimalField(
-        label="Mnożnik terminu", min_value=0, max_value=1, max_digits=4, decimal_places=2, localize=True,
-        help_text="1 = w terminie, 0,8 = kara za spóźnienie.",
+        label="Mnożnik", min_value=0, max_value=1, max_digits=4, decimal_places=2, localize=True,
     )
     komentarz = forms.CharField(
         label="Komentarz końcowy", required=False, widget=forms.Textarea(attrs={"rows": 6}),
@@ -413,6 +412,9 @@ class FormularzOceny(forms.Form):
         super().__init__(*args, **kwargs)
         if punkty_max is not None:
             self.fields["punkty"].validators.append(_NieWiecejNiz(punkty_max))
+        # Znaczniki dla skryptu liczacego punktacje koncowa
+        self.fields["punkty"].widget.attrs.update({"inputmode": "decimal", "data-punkty": ""})
+        self.fields["mnoznik"].widget.attrs.update({"inputmode": "decimal", "data-mnoznik": ""})
 
 
 class FormularzNazwiska(forms.ModelForm):
