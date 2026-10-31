@@ -45,12 +45,9 @@
 <div class="siatka-2">
   <div>
     <div class="karta">
-      <h2>Termin</h2>
-      <p>{% include "kurs/panel/_znacznik.html" %} <span class="drugie">{{ z.stan_opis }}</span></p>
+      <h2>{{ z.przydzial.zestaw.nazwa }}</h2>
       <dl class="opis-pola">
-        <dt>Termin</dt><dd>{{ z.termin_miekki|date:"d.m.Y H:i" }}{% if z.wyjatek_termin_miekki %} <span class="znacznik fiolet">indywidualny</span>{% endif %}</dd>
-        <dt>Termin ostateczny</dt><dd>{{ z.termin_twardy|date:"d.m.Y H:i" }}{% if z.wyjatek_termin_twardy %} <span class="znacznik fiolet">indywidualny</span>{% endif %}</dd>
-        <dt>Sugerowany mnożnik</dt><dd>{% if z.sugerowany_mnoznik is not None %}{{ z.sugerowany_mnoznik|floatformat:"-2" }}{% else %}<span class="slabe">brak</span>{% endif %}</dd>
+        <dt>{% include "kurs/panel/_znacznik.html" %}</dt><dd>{{ z.stan_opis|default:"" }}</dd>
         <dt>Oceniany stan</dt><dd>{% if z.sha_oceniany %}<a class="mono" href="{{ z.url_ocenianego_stanu }}" target="_blank" rel="noopener">{{ z.sha_oceniany|slice:":10" }}</a>{% else %}<span class="slabe">brak</span>{% endif %}</dd>
         <dt>Przeliczono</dt><dd>{% if z.przeliczono %}{{ z.przeliczono|date:"d.m.Y H:i" }}{% else %}<span class="slabe">jeszcze nie</span>{% endif %}</dd>
       </dl>
@@ -107,7 +104,7 @@
     </div>
 
     <div class="karta">
-      <h2>Indywidualny termin</h2>
+      <h2>Termin</h2>
       <div class="edycja-w-miejscu">
         <dl class="opis-pola podglad-edycji">
           <dt>Termin</dt><dd>{{ z.termin_miekki|date:"d.m.Y H:i" }}

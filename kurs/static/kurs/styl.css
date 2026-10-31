@@ -339,6 +339,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--akcent-tlo)
 .opis-pola { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 6px 12px; font-size: 14.5px; }
 .opis-pola dt { color: var(--drugi); }
 .opis-pola dd { margin: 0; overflow-wrap: anywhere; }
+.opis-pola dt .stan { color: var(--tekst); white-space: normal; vertical-align: top; font-size: inherit; }
 .puste { color: var(--slaby); padding: 20px 0; text-align: center; }
 .uwaga { background: var(--zolty-tlo); color: var(--zolty); border: 1px solid color-mix(in srgb, var(--led-zolty) 45%, transparent);
   border-radius: var(--promien); padding: 10px 14px; margin-bottom: 14px; }
