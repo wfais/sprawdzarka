@@ -30,6 +30,10 @@ class BladGitHub(Exception):
         self.komunikat = komunikat
 
 
+class NazwaZajeta(BladGitHub):
+    """Nazwa repozytorium jeszcze zajeta przez repozytorium w trakcie usuwania (GitHub usuwa je z opoznieniem)."""
+
+
 def wyczysc_pamiec():
     """Uzywane w testach i po zmianie konfiguracji."""
     _pamiec.update({"token": None, "wygasa": 0.0, "instalacja": None})
@@ -199,7 +203,12 @@ def utworz_repo(nazwa: str, opis: str = "") -> tuple[dict, bool]:
         return dane, True
     except BladGitHub as blad:
         if blad.status == 422 and "already exists" in blad.komunikat.lower():
-            return pobierz_repo(f"{org()}/{nazwa}"), False
+            try:
+                return pobierz_repo(f"{org()}/{nazwa}"), False
+            except BladGitHub as drugi:
+                if drugi.status == 404:
+                    raise NazwaZajeta(409, f"Nazwa {nazwa} jest jeszcze zajęta przez usuwane repozytorium.") from drugi
+                raise
         raise
 
 
@@ -209,6 +218,19 @@ def ustaw_galaz_domyslna(pelna: str, galaz: str) -> None:
 
 def zapros(pelna: str, login: str, uprawnienie: str = "push") -> None:
     zapytanie("PUT", f"/repos/{pelna}/collaborators/{login}", oczekiwane=(201, 204), json={"permission": uprawnienie})
+
+
+def dostep_studenta(pelna: str, login: str) -> tuple[str, bool]:
+    """Uprawnienie konta do repozytorium (admin, write, read, none) i czy czeka na nie nieprzyjete zaproszenie."""
+    try:
+        uprawnienie = (zapytanie("GET", f"/repos/{pelna}/collaborators/{login}/permission") or {}).get("permission", "")
+    except BladGitHub as blad:
+        if blad.status != 404:
+            raise
+        uprawnienie = "none"
+    oczekuje = any((z.get("invitee") or {}).get("login", "").lower() == login.lower()
+                   for z in stronicuj(f"/repos/{pelna}/invitations"))
+    return uprawnienie, oczekuje
 
 
 def odbierz_dostep(pelna: str, login: str) -> None:

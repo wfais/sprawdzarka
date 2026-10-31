@@ -79,6 +79,17 @@ class Command(BaseCommand):
                           f"termin {_czas(z.termin_miekki)}, ostateczny {_czas(z.termin_twardy)}")
         if not z.repo_id:
             return
+        try:
+            uprawnienie, oczekuje = gh.dostep_studenta(z.repo_nazwa, z.student.login)
+            uwaga = ""
+            if oczekuje:
+                uwaga = "  UWAGA: student nie przyjął zaproszenia, nie widzi repozytorium i nie może w nim pisać"
+            elif uprawnienie not in ("write", "maintain", "admin"):
+                uwaga = "  UWAGA: student nie może pisać w repozytorium (zaproszenie wygasło albo odrzucone?)"
+            self.stdout.write(f"Dostęp na GitHubie: uprawnienie {uprawnienie or '?'}, "
+                              f"zaproszenie oczekuje: {'tak' if oczekuje else 'nie'}{uwaga}")
+        except gh.BladGitHub as blad:
+            self.stdout.write(f"Dostęp na GitHubie: nie udało się sprawdzić ({blad})")
         wzorce = z.przydzial.zestaw.lista_wzorcow()
         w_bazie = list(Wypchniecie.objects.filter(repo_id=z.repo_id).order_by("czas", "id"))
         self.stdout.write(f"Wypchnięcia w bazie ({len(w_bazie)}):")

@@ -149,7 +149,11 @@ def _utworz_repo_studenta(zgloszenie: Zgloszenie) -> dict:
     przydzial, student = zgloszenie.przydzial, zgloszenie.student
     for numer in range(1, 10):
         nazwa = nazwa_repo_studenta(przydzial, student.login, numer)
-        dane, nowe = gh.utworz_repo(nazwa, f"{przydzial.zestaw.nazwa}, {przydzial.grupa.nazwa}: @{student.login}")
+        try:
+            dane, nowe = gh.utworz_repo(nazwa, f"{przydzial.zestaw.nazwa}, {przydzial.grupa.nazwa}: @{student.login}")
+        except gh.NazwaZajeta as blad:
+            log.info("Pomijam nazwe %s: %s", nazwa, blad)
+            continue
         if nowe or not Zgloszenie.objects.filter(repo_id=dane["id"]).exclude(pk=zgloszenie.pk).exists():
             return dane
     raise gh.BladGitHub(0, "Nie udało się znaleźć wolnej nazwy repozytorium.")
@@ -744,7 +748,16 @@ def wyzeruj(zgloszenie: Zgloszenie, usun_repo: bool = False) -> list[str]:
             komunikaty.append(f"Nie udało się odebrać dostępu do repozytorium: {blad}")
         try:
             if usun_repo:
-                gh.usun_repo(zgloszenie.repo_nazwa)
+                # GitHub usuwa repozytorium z opoznieniem i do tego czasu nazwa jest zajeta, wiec ponowna
+                # akceptacja konczylaby sie bledem. Zmiana nazwy przed usunieciem od razu zwalnia nazwe.
+                krotka = zgloszenie.repo_nazwa.split("/", 1)[-1]
+                do_usuniecia = zgloszenie.repo_nazwa
+                try:
+                    nowa = f"{krotka}-usuniete-{timezone.localtime():%Y%m%d%H%M}"[:100]
+                    do_usuniecia = gh.zmien_nazwe(zgloszenie.repo_nazwa, nowa)["full_name"]
+                except gh.BladGitHub as blad:
+                    log.info("Zmiana nazwy przed usunieciem %s nieudana: %s", zgloszenie.repo_nazwa, blad)
+                gh.usun_repo(do_usuniecia)
                 komunikaty.append(f"Repozytorium {zgloszenie.repo_nazwa} usunięte.")
             else:
                 krotka = zgloszenie.repo_nazwa.split("/", 1)[-1]

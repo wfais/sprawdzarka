@@ -86,6 +86,32 @@ def test_zerowanie_archiwizuje_i_pozwala_zaakceptowac_od_nowa(github, przydzial)
 
 
 @pytest.mark.django_db
+def test_zerowanie_z_usunieciem_od_razu_zwalnia_nazwe(github, przydzial):
+    """GitHub usuwa z opoznieniem: przed usunieciem zmiana nazwy, zeby student mogl od razu zaakceptowac."""
+    z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+    komunikaty = uslugi.wyzeruj(z1, usun_repo=True)
+    assert len(github.usuniete) == 1 and github.usuniete[0].startswith("wfais/py-z03-g4-jank-usuniete-")
+    assert any("usunięte" in k for k in komunikaty)
+    z2 = uslugi.akceptuj(przydzial, 77, "jank", "")
+    assert z2.status == Zgloszenie.Status.GOTOWE and z2.repo_nazwa == "wfais/py-z03-g4-jank"
+
+
+@pytest.mark.django_db
+def test_nazwa_w_trakcie_usuwania_dostaje_przyrostek(github, przydzial, monkeypatch):
+    """Repozytorium usuniete recznie na GitHubie: nazwa chwilowo zajeta, student nie czeka."""
+    oryginal = github.utworz_repo
+
+    def utworz(nazwa, opis=""):
+        if nazwa == "py-z03-g4-jank":
+            raise uslugi.gh.NazwaZajeta(409, "w trakcie usuwania")
+        return oryginal(nazwa, opis)
+
+    monkeypatch.setattr(uslugi.gh, "utworz_repo", utworz)
+    z = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+    assert z.status == Zgloszenie.Status.GOTOWE and z.repo_nazwa == "wfais/py-z03-g4-jank-2"
+
+
+@pytest.mark.django_db
 def test_nazwa_zajeta_przez_stare_zgloszenie_dostaje_przyrostek(github, przydzial, monkeypatch):
     z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
     # Zmiana nazwy przy zerowaniu sie nie udala: stare repozytorium nadal ma te sama nazwe
@@ -628,4 +654,9 @@ def test_polecenie_diagnoza(github, przydzial, monkeypatch):
     assert "Adres w aplikacji GitHub: http://testserver/github/webhook/" in tekst and "UWAGA" not in tekst
     assert "push" in tekst and "odpowiedź 200" in tekst
     assert "zmiany: README.md [bez kodu]" in tekst and "(id 77, student)" in tekst
+    assert "Dostęp na GitHubie: uprawnienie write, zaproszenie oczekuje: nie" in tekst and "UWAGA" not in tekst
+    monkeypatch.setattr(uslugi.gh, "dostep_studenta", lambda pelna, login: ("none", True))
+    wyjscie = StringIO()
+    call_command("diagnoza", "jank", stdout=wyjscie)
+    assert "student nie przyjął zaproszenia" in wyjscie.getvalue()
     assert "w bazie: tak" in tekst and "proba" in tekst and "w bazie: NIE" in tekst

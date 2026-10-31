@@ -132,6 +132,9 @@ class FalszywyGitHub:
     def aktywnosc(self, pelna, galaz):
         return iter(self.aktywnosci.get(pelna, []))
 
+    def dostep_studenta(self, pelna, login):
+        return ("write", False)
+
     def adres_webhooka(self):
         return "http://testserver/github/webhook/"
 
@@ -193,7 +196,7 @@ class FalszywyGitHub:
 
 FUNKCJE_KLIENTA = [
     "utworz_repo", "ustaw_galaz_domyslna", "zapros", "utworz_pr", "porownaj", "aktywnosc", "readme",
-    "adres_webhooka", "dostawy_webhookow",
+    "adres_webhooka", "dostawy_webhookow", "dostep_studenta",
     "komentarz_pr", "zamknij_pr", "odbierz_dostep", "zmien_nazwe", "archiwizuj", "usun_repo",
     "pobierz_archiwum", "drzewo_plikow", "recenzja_pr", "chron_galaz", "drzewo_blobow",
     "sha_galezi", "zezwol_aplikacji_na_galaz", "czy_zawiera",
