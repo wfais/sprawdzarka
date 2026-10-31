@@ -1,11 +1,11 @@
 {% extends "kurs/panel/baza.html" %}
 {% block naglowek_strony %}{% if poprawka.w_toku %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
-{% block tytul %}Poprawka {{ poprawka.numer }}: {{ przydzial }}{% endblock %}
+{% block tytul %}Korekta treści {{ poprawka.numer }}: {{ przydzial }}{% endblock %}
 {% block tresc %}
 {% include "kurs/panel/_okruszki.html" with kurs=przydzial.zestaw.kurs grupa=przydzial.grupa przydzial=przydzial only %}
 <div class="naglowek">
   <div>
-    <h1>Poprawka nr {{ poprawka.numer }}</h1>
+    <h1>Korekta treści nr {{ poprawka.numer }}</h1>
     <p class="podtytul">{{ poprawka.utworzono|date:"d.m.Y H:i" }} ·
       {% if poprawka.autoscalanie %}scalana automatycznie, gdy nie ma konfliktu{% else %}każdy student scala sam{% endif %}
       {% if poprawka.opis %}<br>{{ poprawka.opis }}{% endif %}</p>

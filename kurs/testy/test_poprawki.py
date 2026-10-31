@@ -141,7 +141,7 @@ def test_strony_poprawki(client, github, prowadzacy, przydzial):
     poprawki.przetworz()
     karta = client.get(f"/panel/poprawki/{poprawka.pk}/").content.decode()
     assert "scalona automatycznie" in karta and "Ewa Lis" in karta
-    assert "Poprawka tylko dla tej grupy" in client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
+    assert "tylko dla tej grupy" not in client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
 
 
 @pytest.mark.django_db
@@ -197,5 +197,6 @@ def test_poprawka_dla_wszystkich_grup_zestawu(client, github, prowadzacy, przydz
     assert set(zlecone) == {przydzial.pk, g5.pk, g6.pk}  # bez grupy bez zmian i niezaznaczonej
     assert [x["sciezka"] for x in zlecone[g6.pk].pliki] == ["t.py"] and zlecone[g5.pk].opis == "Poprawiony test"
     strona = client.get(f"/panel/zestawy/{zestaw.pk}/poprawka/").content.decode()
-    assert "Wcześniejsze poprawki" in strona and "odświeża się sama" in strona
-    assert f"/panel/zestawy/{zestaw.pk}/poprawka/" in client.get(f"/panel/zestawy/{zestaw.pk}/").content.decode()
+    assert "Wcześniejsze korekty" in strona and "odświeża się sama" in strona and "tylko ta grupa" not in strona
+    strona = client.get(f"/panel/zestawy/{zestaw.pk}/").content.decode()
+    assert f"/panel/zestawy/{zestaw.pk}/poprawka/" in strona and "Korekta treści" in strona and ">Ustawienia</a>" in strona

@@ -677,7 +677,7 @@ def grupa_edycja(request, pk):
         messages.success(request, "Zapisano zmiany grupy.")
         return redirect("panel:grupa", pk=grupa.pk)
     return render(request, "kurs/panel/formularz.html", {
-        "tytul": f"Grupa: {grupa}", "formularz": formularz, "przycisk": "Zapisz", "wstecz_obiekt": grupa,
+        "tytul": f"Ustawienia grupy: {grupa}", "formularz": formularz, "przycisk": "Zapisz", "wstecz_obiekt": grupa,
         **_usuwanie(grupa, "panel:grupa_usun", "Usunięcie grupy razem z wydanymi jej zestawami i zgłoszeniami "
                                               "studentów. Repozytoria na GitHubie zostają."),
     })
@@ -1016,7 +1016,7 @@ def zestaw_poprawka(request, pk):
                     zlecone.append(p.grupa.nazwa)
         if zlecone:
             poprawki.uruchom_w_tle()
-            messages.success(request, f"Poprawka zlecona dla: {', '.join(zlecone)}. Robot wprowadza ją grupa po grupie.")
+            messages.success(request, f"Korekta zlecona dla: {', '.join(zlecone)}. Robot wprowadza ją grupa po grupie.")
         else:
             messages.warning(request, "Nie zaznaczono żadnej grupy ze zmianami do wprowadzenia.")
         return redirect("panel:zestaw_poprawka", pk=pk)

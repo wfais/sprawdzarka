@@ -7,7 +7,7 @@
     <p class="meta">{% if grupa.opis %}<span><b>{{ grupa.opis }}</b></span>{% endif %}<span>{{ kurs.nazwa }} {{ kurs.rok.nazwa }}</span><span>skrót <code>{{ grupa.skrot }}</code></span>
       {% if not grupa.aktywna %}<span class="znacznik szary">nieaktywna</span>{% endif %}</p>
   </div>
-  <div class="przyciski"><a class="przycisk" href="{% url 'panel:grupa_edycja' grupa.pk %}">Edytuj grupę</a></div>
+  <div class="przyciski"><a class="przycisk" href="{% url 'panel:grupa_edycja' grupa.pk %}" title="Nazwa, skrót, opis zajęć, aktywność grupy">Ustawienia</a></div>
 </div>
 <div class="siatka-2">
   <div>

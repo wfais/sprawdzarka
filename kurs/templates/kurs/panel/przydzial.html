@@ -25,7 +25,6 @@
       <button type="submit" class="glowny" data-czekaj="Dodaję do kolejki">Oceń</button>
     </form>
     <a class="przycisk" href="{% url 'panel:przydzial_lista_repo' przydzial.pk %}">Lista repozytoriów</a>
-    <a class="przycisk" href="{% url 'panel:przydzial_poprawka' przydzial.pk %}" title="Zmiany z repozytorium źródłowego tylko dla tej grupy (najpierw podgląd). Dla wszystkich grup: przycisk na stronie zestawu.">Poprawka tylko dla tej grupy</a>
     <a class="przycisk" href="{% url 'panel:przydzial_kopiuj' przydzial.pk %}" title="Ten sam zestaw dla kolejnych grup, z ich terminami">Kopiuj do innych grup</a>
   </div>
 </div>

@@ -3,8 +3,8 @@
 {% block tresc %}
 {% include "kurs/panel/_okruszki.html" with kurs=przydzial.zestaw.kurs grupa=przydzial.grupa przydzial=przydzial only %}
 <div class="naglowek"><div>
-  <h1>Poprawka tylko dla grupy {{ przydzial.grupa.nazwa }}: podgląd</h1>
-  <p class="podtytul">Zwykle poprawka dotyczy wszystkich grup: <a href="{% url 'panel:zestaw_poprawka' przydzial.zestaw_id %}">poprawka dla wszystkich grup zestawu</a>.</p>
+  <h1>Korekta treści dla grupy {{ przydzial.grupa.nazwa }}: podgląd</h1>
+  <p class="podtytul">Korektę dla wielu grup naraz zrobisz na stronie zestawu: <a href="{% url 'panel:zestaw_poprawka' przydzial.zestaw_id %}">korekta treści</a>.</p>
   <p class="podtytul">Po zatwierdzeniu zmiany z repozytorium <span class="mono">{{ przydzial.zrodlo }}</span> trafią do repozytorium
     startowego grupy i do repozytoriów studentów ({{ studentow }}). Praca studentów nie zostanie nadpisana: git scala zmiany,
     a przy konflikcie student dostaje pull request do samodzielnego scalenia.</p>
