@@ -38,7 +38,7 @@ pokazuje tylko termin udostępnienia. Puste pole albo data z przeszłości oznac
 | Praca studenta | | Zestaw w grupie | |
 |---|---|---|---|
 | niebieska | otwarte (repozytorium jest, kodu jeszcze nie ma) | czerwona | czeka na publikację |
-| zielona | w terminie | niebieska | opublikowany, trwa termin |
+| zielona | w terminie | niebieska | aktywny: opublikowany, termin jeszcze nie minął |
 | pomarańczowa | przeterminowane (po terminie, przed ostatecznym) | żółta | minął termin |
 | czerwona | po terminie ostatecznym | zielona | minął termin ostateczny, do oceny |
 | zgaszona | nie oddano | fioletowa (pulsuje) | ponad 7 dni po terminie ostatecznym, nie wszystko ocenione |

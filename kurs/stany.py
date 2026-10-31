@@ -58,7 +58,7 @@ def praca(status: str, kolor: str, mnoznik: Optional[Decimal], termin_miekki: da
 
 ZESTAWY = [
     Stan("nieopublikowany", "publikacja", "czerwony", "Zestaw gotowy, link dla studentów jeszcze nie działa."),
-    Stan("trwa", "trwa termin", "niebieski", "Zestaw opublikowany, termin jeszcze nie minął."),
+    Stan("trwa", "aktywny", "niebieski", "Zestaw opublikowany, termin jeszcze nie minął."),
     Stan("po_terminie", "minął termin", "zolty", "Minął termin, trwa termin ostateczny."),
     Stan("do_oceny", "do oceny", "zielony", "Minął termin ostateczny, prace czekają na ocenę."),
     Stan("zalegle", "zaległe oceny", "fiolet",

@@ -95,6 +95,7 @@ def zestaw(request, token):
     if not uzytkownik:
         return redirect(f"{reverse('student:logowanie')}?next={request.path}")
 
+    uslugi.zamknij_po_terminach(przydzial=przydzial)  # dokladnie o terminie ostatecznym, bez czekania na robota
     student = Student.objects.filter(github_id=uzytkownik["id"]).first()
     zgloszenie = uslugi.aktywne_zgloszenie(przydzial, student)
     wymagaj_nazwiska = not (student and student.imie_nazwisko)

@@ -58,7 +58,7 @@
   --niebieski-tlo: #e0ebfa; --niebieski: #1f5aa3;
   --szary-tlo: #e8ecef;   --szary: #4d5b69;
   --fiolet-tlo: #efe6fd;  --fiolet: #6a2fb3;
-  --promien: 0;  /* ostre narozniki; zaokraglone zostaja tylko diody i elementy z diodami */
+  --promien: 0;  /* ostre narozniki wszedzie, takze diody sa prostokatne */
   --pasek-karty: #dfe5eb;
   --czcionka: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --naglowki: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
@@ -98,24 +98,23 @@ h1 a:hover, h2 a:hover, h3 a:hover { color: var(--akcent); text-decoration: none
 p { margin: 0 0 10px; }
 
 /* --- Diody --- */
-.dioda { --led: var(--led-niebieski); display: inline-block; flex: none; width: 12px; height: 12px; border-radius: 50%;
-  vertical-align: -1px;
-  background: radial-gradient(circle at 35% 32%, #fff 0 10%, color-mix(in srgb, var(--led) 50%, #fff) 24%,
-              var(--led) 58%, color-mix(in srgb, var(--led) 65%, #000) 100%);
-  box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 6px 2px color-mix(in srgb, var(--led) 75%, transparent),
-              0 0 16px 4px color-mix(in srgb, var(--led) 34%, transparent); }
+.dioda { --led: var(--led-niebieski); display: inline-block; flex: none; width: 15px; height: 7px; vertical-align: 1px;
+  background: linear-gradient(color-mix(in srgb, var(--led) 45%, #fff) 0%, var(--led) 38%, var(--led) 68%,
+              color-mix(in srgb, var(--led) 70%, #000) 100%);
+  box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 6px 1px color-mix(in srgb, var(--led) 75%, transparent),
+              0 0 14px 3px color-mix(in srgb, var(--led) 32%, transparent); }
 .dioda.zielony { --led: var(--led-zielony); }
 .dioda.niebieski { --led: var(--led-niebieski); }
 .dioda.zolty { --led: var(--led-zolty); }
 .dioda.pomaranczowy { --led: var(--led-pomaranczowy); }
 .dioda.czerwony { --led: var(--led-czerwony); }
 .dioda.fiolet { --led: var(--led-fiolet); }
-.dioda.wylaczona { background: radial-gradient(circle at 35% 32%, #d3d9de 0 9%, #8a949d 45%, #4f5862 100%);
+.dioda.wylaczona { background: linear-gradient(#aeb6bd 0%, #79838c 45%, #4f5862 100%);
   box-shadow: 0 0 0 1.5px var(--oprawka), inset 0 1px 2px rgba(0, 0, 0, .35); }
 .dioda.pulsuje { animation: puls 1.8s ease-in-out infinite; }
 @keyframes puls {
-  50% { box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 8px 3px color-mix(in srgb, var(--led) 90%, transparent),
-                    0 0 22px 8px color-mix(in srgb, var(--led) 45%, transparent); }
+  50% { box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 8px 2px color-mix(in srgb, var(--led) 90%, transparent),
+                    0 0 20px 6px color-mix(in srgb, var(--led) 45%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .dioda.pulsuje { animation: none; } }
 
@@ -124,14 +123,13 @@ p { margin: 0 0 10px; }
 .dopisek { display: block; font-size: 12px; color: var(--pomaranczowy); margin-top: 2px; padding-left: 19px; }
 /* stan zestawu w grupie: tabliczka z dioda */
 .stan-zestawu { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 13px; font-weight: 500;
-  padding: 2px 10px 2px 8px; border: 1px solid var(--linia); border-radius: 999px; background: var(--karta-2); color: var(--drugi); }
+  padding: 2px 10px 2px 8px; border: 1px solid var(--linia); background: var(--karta-2); color: var(--drugi); }
 .stan-zestawu.fiolet { color: var(--fiolet); border-color: color-mix(in srgb, var(--led-fiolet) 45%, var(--linia)); background: var(--fiolet-tlo); }
 .stan-zestawu.czerwony { color: var(--czerwony); }
 /* liczniki prac z dioda */
 .liczniki, .paski { display: flex; flex-wrap: wrap; gap: 6px; }
 .licznik { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 8px; font-size: 13px; color: var(--drugi);
   border: 1px solid var(--linia); background: var(--karta); white-space: nowrap; }
-.licznik:has(.dioda) { border-radius: 6px; }
 .licznik b { color: var(--tekst); font-variant-numeric: tabular-nums; }
 a.licznik:hover { text-decoration: none; border-color: var(--linia-mocna); background: var(--karta-2); }
 .licznik.aktywny { border-color: var(--tekst); box-shadow: inset 0 0 0 1px var(--tekst); color: var(--tekst); }
@@ -141,7 +139,6 @@ a.licznik:hover { text-decoration: none; border-color: var(--linia-mocna); backg
 .kafelki { display: flex; flex-wrap: wrap; gap: 5px; }
 .kafelek { display: inline-flex; align-items: center; gap: 7px; padding: 2px 9px 2px 7px; font-size: 12.5px; color: var(--tekst);
   border: 1px solid var(--linia); background: var(--karta-2); font-family: var(--mono); }
-.kafelek:has(.dioda) { border-radius: 5px; }
 a.kafelek:hover { text-decoration: none; border-color: var(--linia-mocna); background: var(--karta); }
 
 /* --- Pasek gorny: plyta czolowa --- */
@@ -206,7 +203,7 @@ details.rozwijana[open] > summary { margin-bottom: 14px; }
   background: var(--pasek-karty); border-bottom: 1px solid var(--linia); color: var(--tekst); }
 .karta > .pasek-karty { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .karta > .pasek-karty h2 { margin: 0; }
-.karta-poligonu > h2:first-child { margin-top: -17px; }
+.karta-poligonu > h2:first-child, .karta-poligonu.rozwijana > summary { margin-top: -17px; }
 details.karta.rozwijana > summary { margin: -18px -20px 0; padding: 10px 20px 9px; background: var(--pasek-karty); }
 details.karta.rozwijana:not([open]) { padding-bottom: 0; }
 details.karta.rozwijana[open] > summary { border-bottom: 1px solid var(--linia); }
@@ -313,7 +310,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--akcent-tlo)
 .komunikaty { list-style: none; padding: 0; margin: 0 0 18px; }
 .komunikaty li { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-radius: var(--promien); margin-bottom: 6px;
   background: var(--karta); border: 1px solid var(--linia); }
-.komunikaty li::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; transform: translateY(-1px);
+.komunikaty li::before { content: ""; flex: none; width: 13px; height: 6px; transform: translateY(-2px);
   background: var(--led-niebieski); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-niebieski); }
 .komunikaty li.success::before { background: var(--led-zielony); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-zielony); }
 .komunikaty li.warning::before { background: var(--led-zolty); box-shadow: 0 0 0 1.5px var(--oprawka), 0 0 7px 1px var(--led-zolty); }
@@ -358,6 +355,14 @@ details summary { cursor: pointer; color: var(--drugi); }
 .rok-w-tytule { color: var(--drugi); font-weight: 500; }
 .rok-w-tytule:hover { color: var(--tekst); }
 
+/* --- Naglowek zestawu w grupie: publikacja i zgloszenia przy tytule, pod nim stan i terminy --- */
+.dopisek-tytulu { font: 400 14px/1.4 var(--czcionka); color: var(--drugi); vertical-align: 4px; }
+.dopisek-tytulu > span::before { content: ""; display: inline-block; width: 1px; height: 14px; margin: 0 10px;
+  background: var(--linia-mocna); vertical-align: -2px; }
+.dopisek-tytulu b { color: var(--tekst); font-weight: 600; }
+.terminy-przydzialu { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 6px 0 6px; font-size: 14.5px; color: var(--drugi); }
+.terminy-przydzialu b { color: var(--tekst); font-weight: 600; }
+
 /* --- Pomoc przy terminach --- */
 .pomoc-terminu { margin-top: 6px; }
 label.pomoc-terminu { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--drugi); font-weight: 400; cursor: pointer; }
@@ -382,4 +387,8 @@ td .pomoc-terminu { display: flex; margin-top: 4px; }
 .poziom-uczelni:first-of-type { margin-top: 8px; }
 .grupa-studentow > summary { gap: 12px; }
 .grupa-studentow > summary .przycisk { margin-left: auto; }
+details.rozwijana.grupa-studentow > summary::after, details.rozwijana.grupa-studentow[open] > summary::after { content: none; }
+.przelacznik::after { content: "pokaż"; }
+details[open] > summary .przelacznik::after { content: "ukryj"; }
+.poziom-studentow button, .sekcja-roku .przyciski button { min-width: 64px; justify-content: center; }
 .zakres-studentow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }

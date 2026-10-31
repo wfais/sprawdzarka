@@ -824,6 +824,8 @@ def przydzial_edycja(request, pk):
     przydzial = get_object_or_404(Przydzial, pk=pk)
     formularz = FormularzEdycjiPrzydzialu(request.POST or None, instance=przydzial)
     if request.method == "POST" and formularz.is_valid():
+        if "termin_twardy" in formularz.changed_data:
+            przydzial.zamkniety_po_terminie = None  # nowy termin ostateczny: po nim zestaw znow zamknie sie sam
         formularz.save()
         przydzial.zgloszenia.update(do_przeliczenia=True)
         if przydzial.w_poligonie:

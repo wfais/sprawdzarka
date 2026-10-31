@@ -50,14 +50,15 @@ def test_pokaz_na_kazdym_poziomie(client, github, prowadzacy, przydzial):
                                   termin_miekki=przydzial.termin_miekki, termin_twardy=przydzial.termin_twardy)
     uslugi.akceptuj(p5, 98, "jan", "Jan Kot")
     strona = client.get("/panel/studenci/").content.decode()
-    for adres in [f"?uczelnia={kurs.rok.uczelnia_id}", f"?rok={kurs.rok_id}", f"?kurs={kurs.pk}",
-                  f"?grupa={g5.pk}"]:
-        assert f'href="{adres}"' in strona, adres
+    # Grupy domyslnie zwiniete; "pokaz" na poziomie uczelni, roku i przedmiotu rozwija wszystkie ich grupy
+    assert strona.count("data-przelacz-grupy") == 3 and strona.count('class="przycisk maly przelacznik"') == 2
+    assert 'grupa-studentow" open' not in strona and "Ewa Lis" in strona and "Jan Kot" in strona
+    # Zakres z adresu dalej dziala (np. z zakladki), wtedy grupy sa rozwiniete
     strona = client.get(f"/panel/studenci/?grupa={g5.pk}").content.decode()
     assert "Jan Kot" in strona and "Ewa Lis" not in strona and "pokaż wszystkich" in strona
-    assert f'?kurs={kurs.pk}' in strona  # okruszki prowadza poziom wyzej
+    assert f'?kurs={kurs.pk}' in strona and 'grupa-studentow" open' in strona  # okruszki prowadza poziom wyzej
     strona = client.get(f"/panel/studenci/?kurs={kurs.pk}&q=lis").content.decode()
-    assert "Ewa Lis" in strona and "Jan Kot" not in strona and f'href="?grupa={przydzial.grupa_id}&amp;q=lis"' in strona
+    assert "Ewa Lis" in strona and "Jan Kot" not in strona and 'grupa-studentow" open' in strona
     assert 'name="kurs"' in strona  # wyszukiwanie zostaje na tym poziomie
 
 

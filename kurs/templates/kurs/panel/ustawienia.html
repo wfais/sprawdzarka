@@ -70,8 +70,8 @@ OCENIAJACE_MODELE=demo:a,demo:b,demo:c</pre>
       <button type="submit" data-czekaj="Wczytuję">Wczytaj</button>
     </form>
   </section>
-  <section class="karta karta-poligonu">
-    <h2>Poligon</h2>
+  <details class="karta rozwijana karta-poligonu">
+    <summary><h2>Poligon</h2></summary>
     {% if lata_poligonu %}
     <p class="drugie">Fikcyjne dane do prób, bez połączenia z GitHubem:</p>
     <ul>{% for r in lata_poligonu %}<li><a href="{% url 'panel:rok' r.pk %}">{{ r.pelna_nazwa }}</a>:
@@ -84,13 +84,13 @@ OCENIAJACE_MODELE=demo:a,demo:b,demo:c</pre>
     <form method="post" action="{% url 'panel:poligon_utworz' %}">{% csrf_token %}
       <button type="submit" data-czekaj="Tworzę poligon">Utwórz poligon</button></form>
     {% endif %}
-  </section>
-  <section class="karta">
-    <h2>Surowe dane</h2>
+  </details>
+  <details class="karta rozwijana">
+    <summary><h2>Surowe dane</h2></summary>
     <p class="drugie">Panel Django: bezpośredni podgląd i edycja wszystkich tabel. Bez zabezpieczeń panelu prowadzącego
       (usuwanie bez wpisywania nazwy), więc tylko awaryjnie.</p>
     {% if uzytkownik_admin %}<a class="przycisk" href="{% url 'admin:index' %}">Otwórz panel Django</a>
     {% else %}<p class="slabe">Wymaga konta administratora.</p>{% endif %}
-  </section>
+  </details>
 </div>
 {% endblock %}

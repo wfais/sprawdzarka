@@ -5,12 +5,15 @@
 {% include "kurs/panel/_okruszki.html" with kurs=przydzial.zestaw.kurs grupa=przydzial.grupa zestaw=przydzial.zestaw only %}
 <div class="naglowek">
   <div>
-    <h1>{{ przydzial.grupa.nazwa }}: {{ przydzial.zestaw.nazwa }}</h1>
-    <p class="meta">{% with p=przydzial %}{% include "kurs/panel/_stan_zestawu.html" %}{% endwith %}
-      {% if przydzial.publikacja %}<span>{% if przydzial.opublikowany %}opublikowany{% else %}publikacja{% endif %} <b>{{ przydzial.publikacja|date:"d.m.Y H:i" }}</b></span>{% endif %}
-      <span>termin <b>{{ przydzial.termin_miekki|date:"d.m.Y H:i" }}</b></span>
+    <h1>{{ przydzial.grupa.nazwa }}: {{ przydzial.zestaw.nazwa }}<span class="dopisek-tytulu">
+      {% if przydzial.publikacja %}<span>{% if przydzial.opublikowany %}opublikowany{% else %}publikacja{% endif %} {{ przydzial.publikacja|date:"d.m.Y H:i" }}</span>{% endif %}
+      <span>{% if przydzial.otwarty %}przyjmuje zgłoszenia{% else %}<b>zamknięty dla nowych zgłoszeń</b>{% if przydzial.zamkniety_po_terminie %} po terminie ostatecznym{% endif %}{% endif %}</span></span></h1>
+    <div class="terminy-przydzialu">
+      {% with p=przydzial %}{% include "kurs/panel/_stan_zestawu.html" %}{% endwith %}
+      <span>termin oddania <b>{{ przydzial.termin_miekki|date:"d.m.Y H:i" }}</b></span>
       <span>ostateczny <b>{{ przydzial.termin_twardy|date:"d.m.Y H:i" }}</b></span>
-      <span>{% if przydzial.otwarty %}przyjmuje zgłoszenia{% else %}<b>zamknięty dla nowych zgłoszeń</b>{% endif %}</span></p>
+      <a class="przycisk maly" href="{% url 'panel:przydzial_edycja' przydzial.pk %}">Edycja terminów</a>
+    </div>
     {% if przydzial.repo_zrodlowe %}<p class="meta"><span>inne repozytorium źródłowe <a class="mono" href="https://github.com/{{ przydzial.repo_zrodlowe }}" target="_blank" rel="noopener">{{ przydzial.repo_zrodlowe }}</a></span></p>{% endif %}
   </div>
   <div class="przyciski">
@@ -19,11 +22,10 @@
     </form>
     <form method="post" action="{% url 'panel:przydzial_ocen' przydzial.pk %}" class="w-linii"
           data-potwierdz="Ocenić wszystkie oddane prace, które nie mają aktualnej oceny (także po zmianie zadań lub modeli)?">{% csrf_token %}
-      <button type="submit" class="glowny" data-czekaj="Dodaję do kolejki">Oceń automatycznie</button>
+      <button type="submit" class="glowny" data-czekaj="Dodaję do kolejki">Oceń</button>
     </form>
     <a class="przycisk" href="{% url 'panel:przydzial_lista_repo' przydzial.pk %}">Lista repozytoriów</a>
     <a class="przycisk" href="{% url 'panel:przydzial_poprawka' przydzial.pk %}" title="Przenieś zmiany z repozytorium źródłowego do repozytoriów studentów">Poprawka ze źródła</a>
-    <a class="przycisk" href="{% url 'panel:przydzial_edycja' przydzial.pk %}">Terminy</a>
     <a class="przycisk" href="{% url 'panel:przydzial_kopiuj' przydzial.pk %}" title="Ten sam zestaw dla kolejnych grup, z ich terminami">Kopiuj do innych grup</a>
   </div>
 </div>
@@ -92,7 +94,7 @@
         {% elif e.zatwierdzona %}<span class="znacznik szary">zatwierdzona{% if e.automatycznie %} automatycznie{% endif %}</span>
         {% elif e.sporna %}<span class="znacznik zolty" title="wymaga decyzji">do decyzji {{ e.suma|floatformat:"-2" }}</span>
         {% else %}<span class="znacznik zielony" title="modele zgodne">zgodna {{ e.suma|floatformat:"-2" }}</span>{% endif %}
-        {% if z.ocena_nieaktualna %}<div class="male slabe" title="student zmienił oceniany stan albo zmieniono zadania lub modele; kliknij Oceń automatycznie">nieaktualna</div>{% endif %}
+        {% if z.ocena_nieaktualna %}<div class="male slabe" title="student zmienił oceniany stan albo zmieniono zadania lub modele; kliknij Oceń">nieaktualna</div>{% endif %}
       {% else %}<span class="slabe male">brak</span>{% endif %}{% endwith %}</td>
       <td class="liczba">{% if z.mnoznik is not None %}<strong>{{ z.mnoznik|floatformat:"-2" }}</strong>{% elif z.sugerowany_mnoznik is not None %}<span class="slabe" title="sugestia">{{ z.sugerowany_mnoznik|floatformat:"-2" }}?</span>{% endif %}</td>
       <td class="liczba">{% if z.pr_zamkniety %}<strong>{{ z.wynik|floatformat:"-2" }}</strong>{% else %}<span class="slabe">-</span>{% endif %}</td>

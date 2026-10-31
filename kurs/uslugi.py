@@ -620,10 +620,24 @@ def odswiez_przydzial(przydzial: Przydzial, synchronizacja: bool = True) -> tupl
     return licznik, bledy
 
 
+def zamknij_po_terminach(teraz: Optional[datetime] = None, przydzial: Optional[Przydzial] = None) -> int:
+    """Po terminie ostatecznym zestaw przestaje przyjmowac nowe zgloszenia. Tylko raz: gdy prowadzacy wlaczy
+    przyjmowanie z powrotem, zostaje wlaczone (do kolejnej zmiany terminu ostatecznego)."""
+    teraz = teraz or timezone.now()
+    do_zamkniecia = Przydzial.objects.filter(otwarty=True, termin_twardy__lt=teraz, zamkniety_po_terminie__isnull=True)
+    if przydzial is not None:
+        do_zamkniecia = do_zamkniecia.filter(pk=przydzial.pk)
+    zamkniete = do_zamkniecia.update(otwarty=False, zamkniety_po_terminie=teraz)
+    if zamkniete and przydzial is not None:
+        przydzial.refresh_from_db(fields=["otwarty", "zamkniety_po_terminie"])
+    return zamkniete
+
+
 def cykl_robota(pelny: bool) -> None:
     """Jedno przejscie robota: przeliczenie oczekujacych, a w pelnym cyklu tez synchronizacja."""
     close_old_connections()
     teraz = timezone.now()
+    zamknij_po_terminach(teraz)
     # Porzucone tworzenie repozytorium (np. przerwane zadanie przegladarki)
     for zgloszenie in Zgloszenie.objects.filter(
         Q(w_toku_od__isnull=True) | Q(w_toku_od__lt=teraz - timedelta(minutes=3)),

@@ -33,26 +33,28 @@
 {% endif %}
 
 {% for u in uczelnie %}
+<div class="zakres-przelacznika">
 <div class="poziom-studentow poziom-uczelni">
   <h2><span class="plakietka">{{ u.uczelnia.skrot|upper }}</span>{{ u.uczelnia.nazwa }} <span class="drugie male">osób: {{ u.liczba }}</span></h2>
-  <a class="przycisk maly" href="?uczelnia={{ u.uczelnia.pk }}{{ dodatki }}" title="Tylko studenci tej uczelni">pokaż</a>
+  <button type="button" class="maly" data-przelacz-grupy title="Wszystkie grupy tej uczelni">pokaż</button>
 </div>
 {% for r in u.lista_lat %}
-<section class="sekcja-roku{% if r.rok.poligon %} poligon{% endif %}">
+<section class="sekcja-roku zakres-przelacznika{% if r.rok.poligon %} poligon{% endif %}">
   <div class="naglowek">
     <div><h2><a href="{% url 'panel:rok' r.rok.pk %}">{{ r.rok.nazwa }}</a> <span class="drugie male">osób: {{ r.liczba }}</span></h2>
       <p>{% if r.rok.poligon %}<span class="znacznik zolty">poligon: dane fikcyjne</span>{% endif %}{% if r.rok.zarchiwizowany %}<span class="znacznik szary">zarchiwizowany</span>{% endif %}</p></div>
-    <div class="przyciski"><a class="przycisk maly" href="?rok={{ r.rok.pk }}{{ dodatki }}" title="Tylko studenci tego roku">pokaż</a></div>
+    <div class="przyciski"><button type="button" class="maly" data-przelacz-grupy title="Wszystkie grupy tego roku">pokaż</button></div>
   </div>
   {% for k in r.lista_kursow %}
+  <div class="zakres-przelacznika">
   <div class="poziom-studentow">
     <h3><a href="{% url 'panel:kurs' k.kurs.pk %}">{{ k.kurs.nazwa }}</a>{% if k.kurs.kod %} <span class="kod-przedmiotu">{{ k.kurs.kod }}</span>{% endif %} <span class="drugie male">osób: {{ k.liczba }}</span></h3>
-    <a class="przycisk maly" href="?kurs={{ k.kurs.pk }}{{ dodatki }}" title="Tylko studenci tego przedmiotu">pokaż</a>
+    <button type="button" class="maly" data-przelacz-grupy title="Wszystkie grupy tego przedmiotu">pokaż</button>
   </div>
   {% for g in k.grupy %}
-  <details class="karta rozwijana grupa-studentow" open>
+  <details class="karta rozwijana grupa-studentow"{% if q or filtr or zakres %} open{% endif %}>
     <summary><h2>{{ g.grupa.nazwa }} <span class="drugie male">{% if g.grupa.opis %}{{ g.grupa.opis }} · {% endif %}osób: {{ g.wiersze|length }}</span></h2>
-      <a class="przycisk maly" href="?grupa={{ g.grupa.pk }}{{ dodatki }}" title="Tylko ta grupa">pokaż</a></summary>
+      <span class="przycisk maly przelacznik" aria-hidden="true"></span></summary>
     <div class="przewijanie">
     <table class="tabela tabela-studentow">
       <tr><th class="lp">Lp.</th><th>Imię i nazwisko</th><th>Konto GitHub</th>
@@ -69,9 +71,11 @@
     </div>
   </details>
   {% endfor %}
+  </div>
   {% endfor %}
 </section>
 {% endfor %}
+</div>
 {% endfor %}
 
 {% if bez_grupy %}

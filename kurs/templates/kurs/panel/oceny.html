@@ -28,7 +28,7 @@
       <td>{% if p.do_oceny %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}"
           data-potwierdz="Ocenić automatycznie oddane prace bez aktualnej oceny ({{ p.zestaw.nazwa }}, {{ p.grupa.nazwa }})?">{% csrf_token %}
           <input type="hidden" name="nastepny" value="oceny">
-          <button class="maly" type="submit" data-czekaj="Dodaję do kolejki">Oceń automatycznie</button></form>{% endif %}</td>
+          <button class="maly" type="submit" data-czekaj="Dodaję do kolejki">Oceń</button></form>{% endif %}</td>
     </tr>
     {% endfor %}
   </table>

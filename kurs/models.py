@@ -212,7 +212,13 @@ class Przydzial(models.Model):
         help_text="Nazwy repozytoriów: przedrostek + login, np. przedrostek py-z03-g4- daje py-z03-g4-jkowalski.",
     )
     token = models.CharField(max_length=40, unique=True, default=nowy_token, editable=False)
-    otwarty = models.BooleanField("przyjmuje zgłoszenia", default=True)
+    otwarty = models.BooleanField(
+        "przyjmuje zgłoszenia", default=True,
+        help_text="Link pozwala zaakceptować zestaw nowym osobom. Po terminie ostatecznym wyłącza się samo; "
+                  "możesz je potem włączyć z powrotem. Zmiana terminu ostatecznego ponawia samoczynne wyłączenie.",
+    )
+    # Kiedy robot wylaczyl przyjmowanie zgloszen po terminie ostatecznym (puste: jeszcze nie wylaczal)
+    zamkniety_po_terminie = models.DateTimeField(null=True, blank=True, editable=False)
     auto_ocena = models.BooleanField(
         "oceniaj automatycznie po terminie ostatecznym", default=False,
         help_text="Po terminie ostatecznym robot sam uruchomi testy i ocenę modelami dla wszystkich zgłoszeń.",

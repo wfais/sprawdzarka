@@ -401,8 +401,44 @@ def test_oceny_pokazuja_prace_do_decyzji(client, github, prowadzacy, przydzial):
     z = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
     Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="c" * 40)
     strona = client.get("/panel/oceny/").content.decode()
-    assert f"/panel/przydzialy/{przydzial.pk}/ocen/" in strona and "Oceń automatycznie" in strona
+    assert f"/panel/przydzialy/{przydzial.pk}/ocen/" in strona and ">Oceń</button>" in strona
     # Bez nowych prac do oceny przycisk wraca na liste Oceny
     Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="")
     odp = client.post(f"/panel/przydzialy/{przydzial.pk}/ocen/", {"nastepny": "oceny"})
     assert odp["Location"] == "/panel/oceny/"
+
+
+@pytest.mark.django_db
+def test_przyjmowanie_zgloszen_wylacza_sie_po_terminie_ostatecznym(client, github, prowadzacy, przydzial):
+    from kurs import uslugi
+    teraz = timezone.now()
+    Przydzial.objects.filter(pk=przydzial.pk).update(termin_miekki=teraz - timedelta(days=8),
+                                                     termin_twardy=teraz - timedelta(minutes=1))
+    assert uslugi.zamknij_po_terminach() == 1
+    przydzial.refresh_from_db()
+    assert not przydzial.otwarty and przydzial.zamkniety_po_terminie
+    assert "po terminie ostatecznym" in client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
+    # Prowadzacy wlacza przyjmowanie z powrotem: robot juz go nie wylacza
+    Przydzial.objects.filter(pk=przydzial.pk).update(otwarty=True)
+    assert uslugi.zamknij_po_terminach() == 0
+    # Nowy termin ostateczny: po nim zestaw znow zamyka sie sam
+    client.post(f"/panel/przydzialy/{przydzial.pk}/edycja/", {
+        "termin_miekki": timezone.localtime(teraz + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),
+        "termin_twardy": timezone.localtime(teraz + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+        "otwarty": "on",
+    })
+    przydzial.refresh_from_db()
+    assert przydzial.otwarty and przydzial.zamkniety_po_terminie is None
+    assert uslugi.zamknij_po_terminach(teraz + timedelta(days=4)) == 1
+
+
+@pytest.mark.django_db
+def test_po_terminie_ostatecznym_link_nie_przyjmuje_od_razu(client, github, przydzial):
+    """Strona studenta zamyka zestaw sama, bez czekania na robota."""
+    teraz = timezone.now()
+    Przydzial.objects.filter(pk=przydzial.pk).update(termin_miekki=teraz - timedelta(days=2),
+                                                     termin_twardy=teraz - timedelta(seconds=5))
+    zaloguj_studenta(client)
+    assert "nie przyjmuje już zgłoszeń" in client.get(f"/z/{przydzial.token}/").content.decode()
+    przydzial.refresh_from_db()
+    assert not przydzial.otwarty and przydzial.zamkniety_po_terminie

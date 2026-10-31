@@ -160,3 +160,38 @@ function terminyNaDzisiaj(formularz) {
     });
   });
 })();
+
+// Studenci: "pokaż" na poziomie uczelni, roku albo przedmiotu rozwija wszystkie jego grupy, "ukryj" zwija
+(function () {
+  var przyciski = document.querySelectorAll("[data-przelacz-grupy]");
+  if (!przyciski.length) return;
+
+  function grupy(przycisk) {
+    var zakres = przycisk.closest(".zakres-przelacznika");
+    return zakres ? Array.prototype.slice.call(zakres.querySelectorAll("details.grupa-studentow")) : [];
+  }
+
+  function wszystkieOtwarte(lista) {
+    return lista.length > 0 && lista.every(function (d) { return d.open; });
+  }
+
+  function odswiez() {
+    przyciski.forEach(function (przycisk) {
+      var otwarte = wszystkieOtwarte(grupy(przycisk));
+      przycisk.textContent = otwarte ? "ukryj" : "pokaż";
+      przycisk.setAttribute("aria-expanded", otwarte ? "true" : "false");
+    });
+  }
+
+  przyciski.forEach(function (przycisk) {
+    przycisk.addEventListener("click", function () {
+      var lista = grupy(przycisk);
+      var otworz = !wszystkieOtwarte(lista);
+      lista.forEach(function (d) { d.open = otworz; });
+      odswiez();
+    });
+  });
+  // Zdarzenie toggle nie przechodzi w gore drzewa, wiec nasluch w fazie przechwytywania
+  document.addEventListener("toggle", odswiez, true);
+  odswiez();
+})();
