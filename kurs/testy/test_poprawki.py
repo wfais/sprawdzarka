@@ -141,7 +141,7 @@ def test_strony_poprawki(client, github, prowadzacy, przydzial):
     poprawki.przetworz()
     karta = client.get(f"/panel/poprawki/{poprawka.pk}/").content.decode()
     assert "scalona automatycznie" in karta and "Ewa Lis" in karta
-    assert "Poprawka ze źródła" in client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
+    assert "Poprawka tylko dla tej grupy" in client.get(f"/panel/przydzialy/{przydzial.pk}/").content.decode()
 
 
 @pytest.mark.django_db
@@ -162,3 +162,40 @@ def test_podglad_bez_zmian_niczego_nie_zleca(client, github, prowadzacy, przydzi
     tresc = client.get(f"/panel/przydzialy/{przydzial.pk}/poprawka/").content.decode()
     assert "Brak zmian" in tresc and "nic nie zostało zmienione" in tresc and "Zatwierdzam" not in tresc
     assert not Poprawka.objects.exists()
+
+
+@pytest.mark.django_db
+def test_poprawka_dla_wszystkich_grup_zestawu(client, github, prowadzacy, przydzial):
+    from kurs.models import Grupa, Przydzial
+    teraz = timezone.now()
+    kurs, zestaw = przydzial.zestaw.kurs, przydzial.zestaw
+
+    def nowy(skrot, sha, **terminy):
+        g = Grupa.objects.create(kurs=kurs, nazwa=f"Grupa {skrot}", skrot=skrot)
+        return Przydzial.objects.create(
+            zestaw=zestaw, grupa=g, przedrostek_repo=f"py-z03-{skrot}-", repo_startowe=f"wfais/py-z03-{skrot}-start",
+            sha_startowy=sha, termin_miekki=terminy.get("miekki", przydzial.termin_miekki),
+            termin_twardy=terminy.get("twardy", przydzial.termin_twardy))
+
+    g5 = nowy("g5", przydzial.sha_startowy)                     # ten sam stan startowy co grupa 4
+    g6 = nowy("g6", "b" * 40)                                   # wydany pozniej: czesc poprawki juz ma
+    g7 = nowy("g7", przydzial.sha_startowy, miekki=teraz - timedelta(days=9), twardy=teraz - timedelta(days=2))
+    g8 = nowy("g8", "c" * 40)                                   # stan jak zrodlo: bez zmian
+    github.drzewa = {przydzial.sha_startowy: {"README.md": "1", "t.py": "3"}, "b" * 40: {"README.md": "2", "t.py": "3"},
+                     "c" * 40: {"README.md": "2", "t.py": "4"}, "zrodlo-wfais/python-zestaw3": {"README.md": "2", "t.py": "4"}}
+    github.bloby = {"3": b"assert f(2) == 3\n", "4": b"assert f(2) == 4\n", "1": b"stary\n", "2": b"nowy\n"}
+    strona = client.get(f"/panel/zestawy/{zestaw.pk}/poprawka/").content.decode()
+    assert "nic nie zostało jeszcze zmienione" in strona and not Poprawka.objects.exists()
+    assert f"Zmiany dla: {przydzial.grupa.nazwa}, Grupa g5, Grupa g7" in strona and "Zmiany dla: Grupa g6" in strona
+    assert f'value="{g7.pk}" id="grupa-{g7.pk}">' in strona  # po terminie ostatecznym: niezaznaczona
+    assert f'value="{g5.pk}" id="grupa-{g5.pk}" checked>' in strona and "Bez zmian" in strona and "Grupa g8" in strona
+    assert '<span class="dodany">+assert f(2) == 4</span>' in strona
+    odp = client.post(f"/panel/zestawy/{zestaw.pk}/poprawka/",
+                      {"grupa": [przydzial.pk, g5.pk, g6.pk, g8.pk], "opis": "Poprawiony test", "autoscalanie": "1"})
+    assert odp["Location"] == f"/panel/zestawy/{zestaw.pk}/poprawka/"
+    zlecone = {p.przydzial_id: p for p in Poprawka.objects.all()}
+    assert set(zlecone) == {przydzial.pk, g5.pk, g6.pk}  # bez grupy bez zmian i niezaznaczonej
+    assert [x["sciezka"] for x in zlecone[g6.pk].pliki] == ["t.py"] and zlecone[g5.pk].opis == "Poprawiony test"
+    strona = client.get(f"/panel/zestawy/{zestaw.pk}/poprawka/").content.decode()
+    assert "Wcześniejsze poprawki" in strona and "odświeża się sama" in strona
+    assert f"/panel/zestawy/{zestaw.pk}/poprawka/" in client.get(f"/panel/zestawy/{zestaw.pk}/").content.decode()

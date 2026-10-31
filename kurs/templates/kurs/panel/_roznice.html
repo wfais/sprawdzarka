@@ -1,0 +1,11 @@
+{% for r in roznice %}
+<details class="roznica-pliku"{% if roznice|length <= 5 %} open{% endif %}>
+  <summary><span class="mono">{{ r.sciezka }}</span>
+    <span class="znacznik {% if r.rodzaj == 'dodany' %}zielony{% elif r.rodzaj == 'usunięty' %}czerwony{% else %}niebieski{% endif %}">{{ r.rodzaj }}</span>
+    {% if r.dodane %}<span class="male" style="color:var(--zielony)">+{{ r.dodane }}</span>{% endif %}
+    {% if r.usuniete %}<span class="male" style="color:var(--czerwony)">&minus;{{ r.usuniete }}</span>{% endif %}</summary>
+  {% if r.wiersze %}<pre class="roznica">{% for rodzaj, tekst in r.wiersze %}<span class="{{ rodzaj }}">{{ tekst }}</span>{% endfor %}</pre>{% endif %}
+  {% if r.uwaga %}<p class="male slabe" style="margin:6px 0 0">{{ r.uwaga }}</p>{% endif %}
+</details>
+{% endfor %}
+{% if pominietych %}<p class="male slabe">Kolejne pliki bez podglądu: {{ pominietych }}.</p>{% endif %}

@@ -28,20 +28,59 @@ from .models import Poprawka, PoprawkaZgloszenia, Przydzial, Zgloszenie
 log = logging.getLogger(__name__)
 
 
-def podglad(przydzial: Przydzial) -> list[dict]:
-    """Pliki, ktorymi biezacy stan repozytorium zrodlowego rozni sie od stanu startowego grupy."""
+def _zmiany(przydzial: Przydzial) -> dict:
+    """Sciezka -> (skrot w stanie startowym grupy, skrot w zrodle) dla plikow, ktore sie roznia."""
     zestaw = przydzial.zestaw
     nowe = gh.drzewo_blobow(przydzial.zrodlo, gh.sha_galezi(przydzial.zrodlo))
     stare = gh.drzewo_blobow(przydzial.repo_startowe, przydzial.sha_startowy)
     if not zestaw.kopiuj_actions:
         nowe = {s: b for s, b in nowe.items() if not s.startswith(KATALOG_ACTIONS + "/")}
-    wynik = []
-    for sciezka in sorted(set(nowe) | set(stare)):
-        if nowe.get(sciezka) == stare.get(sciezka):
+    return {s: (stare.get(s), nowe.get(s)) for s in sorted(set(nowe) | set(stare)) if nowe.get(s) != stare.get(s)}
+
+
+def _lista_plikow(zmiany: dict) -> list[dict]:
+    return [{"sciezka": s, "rodzaj": "dodany" if stary is None else ("usunięty" if nowy is None else "zmieniony")}
+            for s, (stary, nowy) in zmiany.items()]
+
+
+def podglad(przydzial: Przydzial) -> list[dict]:
+    """Pliki, ktorymi biezacy stan repozytorium zrodlowego rozni sie od stanu startowego grupy."""
+    return _lista_plikow(_zmiany(przydzial))
+
+
+def podglad_zestawu(zestaw, teraz=None) -> dict:
+    """Podglad poprawki dla wszystkich grup zestawu. Grupy z tymi samymi zmianami (to samo zrodlo i ten sam
+    stan startowy) tworza jeden pakiet z jedna lista roznic. Domyslnie zaznaczone sa grupy przed terminem
+    ostatecznym; po nim nowe testy od razu zmienilyby ocene automatyczna."""
+    teraz = teraz or timezone.now()
+    pakiety, bez_zmian, pominiete = {}, [], []
+    for p in zestaw.przydzialy.select_related("grupa", "zestaw__kurs__rok").order_by("grupa__nazwa"):
+        if p.w_poligonie:
+            pominiete.append((p, "poligon, bez GitHuba"))
             continue
-        rodzaj = "dodany" if sciezka not in stare else ("usunięty" if sciezka not in nowe else "zmieniony")
-        wynik.append({"sciezka": sciezka, "rodzaj": rodzaj})
-    return wynik
+        if not p.repo_startowe or not p.sha_startowy:
+            pominiete.append((p, "brak repozytorium startowego"))
+            continue
+        try:
+            zmiany = _zmiany(p)
+        except gh.BladGitHub as blad:
+            pominiete.append((p, f"nie udało się porównać: {blad}"))
+            continue
+        if not zmiany:
+            bez_zmian.append(p)
+            continue
+        p.trwa = p.poprawki.filter(stan__in=[Poprawka.Stan.OCZEKUJE, Poprawka.Stan.W_TOKU]).exists()
+        p.po_terminie = teraz > p.termin_twardy
+        p.zaznaczona = not p.trwa and not p.po_terminie
+        p.studentow = p.zgloszenia.filter(status=Zgloszenie.Status.GOTOWE).count()
+        klucz = (p.zrodlo, tuple(zmiany.items()))
+        pakiet = pakiety.setdefault(klucz, {"zrodlo": p.zrodlo, "przydzialy": [], "pliki": _lista_plikow(zmiany)})
+        pakiet["przydzialy"].append(p)
+    lista = list(pakiety.values())
+    for pakiet in lista:
+        pakiet["roznice"] = roznice(pakiet["przydzialy"][0], pakiet["pliki"])
+        pakiet["pominietych"] = max(len(pakiet["pliki"]) - MAKS_PLIKOW_PODGLADU, 0)
+    return {"pakiety": lista, "bez_zmian": bez_zmian, "pominiete": pominiete}
 
 
 MAKS_ROZMIAR_PODGLADU = 200_000  # bajtow na plik

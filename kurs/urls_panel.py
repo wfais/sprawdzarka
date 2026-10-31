@@ -57,6 +57,7 @@ urlpatterns = [
     path("przydzialy/<int:pk>/repozytoria.txt", w.przydzial_lista_repo, name="przydzial_lista_repo"),
     path("przydzialy/<int:pk>/wyslij-oceny/", w.przydzial_wyslij_oceny, name="przydzial_wyslij_oceny"),
     path("przydzialy/<int:pk>/poprawka/", w.przydzial_poprawka, name="przydzial_poprawka"),
+    path("zestawy/<int:pk>/poprawka/", w.zestaw_poprawka, name="zestaw_poprawka"),
     path("poprawki/<int:pk>/", w.poprawka, name="poprawka"),
     path("zgloszenia/<int:pk>/", w.zgloszenie, name="zgloszenie"),
     path("zgloszenia/<int:pk>/termin/", w.zgloszenie_termin, name="zgloszenie_termin"),

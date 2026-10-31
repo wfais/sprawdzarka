@@ -999,6 +999,34 @@ def przydzial_poprawka(request, pk):
 
 
 @prowadzacy
+def zestaw_poprawka(request, pk):
+    """Poprawka ze zrodla dla wszystkich grup zestawu: jeden podglad, jedno zatwierdzenie, wprowadzanie grupa po grupie."""
+    zestaw = get_object_or_404(Zestaw.objects.select_related("kurs__rok__uczelnia"), pk=pk)
+    if _zamrozony(request, zestaw.kurs.rok):
+        return redirect("panel:zestaw", pk=pk)
+    podglad = poprawki.podglad_zestawu(zestaw)
+    if request.method == "POST":
+        wybrane = {int(x) for x in request.POST.getlist("grupa") if x.isdigit()}
+        opis, autoscalanie = request.POST.get("opis", ""), request.POST.get("autoscalanie") == "1"
+        zlecone = []
+        for pakiet in podglad["pakiety"]:
+            for p in pakiet["przydzialy"]:
+                if p.pk in wybrane and not p.trwa:
+                    poprawki.zlec(p, opis, autoscalanie, pakiet["pliki"])
+                    zlecone.append(p.grupa.nazwa)
+        if zlecone:
+            poprawki.uruchom_w_tle()
+            messages.success(request, f"Poprawka zlecona dla: {', '.join(zlecone)}. Robot wprowadza ją grupa po grupie.")
+        else:
+            messages.warning(request, "Nie zaznaczono żadnej grupy ze zmianami do wprowadzenia.")
+        return redirect("panel:zestaw_poprawka", pk=pk)
+    historia = list(Poprawka.objects.filter(przydzial__zestaw=zestaw).select_related("przydzial__grupa")[:40])
+    return render(request, "kurs/panel/zestaw_poprawka.html", {
+        "zestaw": zestaw, **podglad, "historia": historia, "w_toku": any(h.w_toku for h in historia),
+    })
+
+
+@prowadzacy
 def poprawka(request, pk):
     poprawka = get_object_or_404(Poprawka.objects.select_related("przydzial__zestaw", "przydzial__grupa"), pk=pk)
     if request.method == "POST":

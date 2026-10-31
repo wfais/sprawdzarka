@@ -1,0 +1,77 @@
+{% extends "kurs/panel/baza.html" %}
+{% block naglowek_strony %}{% if w_toku %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}
+{% block tytul %}Poprawka: {{ zestaw.nazwa }}{% endblock %}
+{% block tresc %}
+{% include "kurs/panel/_okruszki.html" with kurs=zestaw.kurs zestaw=zestaw only %}
+<div class="naglowek"><div>
+  <h1>Poprawka ze źródła dla wszystkich grup: podgląd</h1>
+  <p class="podtytul">Po zatwierdzeniu zmiany ze źródła trafią do repozytoriów startowych zaznaczonych grup i do repozytoriów
+    ich studentów, grupa po grupie. Praca studentów nie zostanie nadpisana: git scala zmiany, a przy konflikcie student dostaje
+    pull request do samodzielnego scalenia.</p>
+  <p class="stan" style="margin:8px 0 0"><i class="dioda niebieski" aria-hidden="true"></i><b>To tylko podgląd: nic nie zostało jeszcze zmienione.</b></p>
+</div></div>
+
+{% if pakiety %}
+<form method="post" class="formularz" data-potwierdz="Wprowadzić poprawkę do repozytoriów studentów zaznaczonych grup?">{% csrf_token %}
+  {% for pakiet in pakiety %}
+  <section class="karta">
+    <h2>Zmiany dla: {% for p in pakiet.przydzialy %}{{ p.grupa.nazwa }}{% if not forloop.last %}, {% endif %}{% endfor %}</h2>
+    {% if pakiet.zrodlo != zestaw.repo_zrodlowe %}<p class="male drugie">Własne repozytorium źródłowe tych grup: <span class="mono">{{ pakiet.zrodlo }}</span></p>{% endif %}
+    <table class="tabela wybor-grup-poprawki">
+      {% for p in pakiet.przydzialy %}
+      <tr>
+        <td style="width:28px"><input type="checkbox" name="grupa" value="{{ p.pk }}" id="grupa-{{ p.pk }}"{% if p.zaznaczona %} checked{% endif %}{% if p.trwa %} disabled{% endif %}></td>
+        <td><label for="grupa-{{ p.pk }}"><b>{{ p.grupa.nazwa }}</b></label> <span class="male drugie">studentów {{ p.studentow }} · termin ostateczny {{ p.termin_twardy|date:"d.m.Y H:i" }}</span>
+          {% if p.trwa %}<div class="male" style="color:var(--pomaranczowy)">Poprzednia poprawka tej grupy jest jeszcze wprowadzana.</div>
+          {% elif p.po_terminie %}<div class="male" style="color:var(--pomaranczowy)">Po terminie ostatecznym: nowe testy od razu zmienią ocenę automatyczną tej grupy. Zaznacz, jeśli to zamierzone.</div>{% endif %}</td>
+        <td style="text-align:right"><a class="male" href="{% url 'panel:przydzial_poprawka' p.pk %}">tylko ta grupa</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% include "kurs/panel/_roznice.html" with roznice=pakiet.roznice pominietych=pakiet.pominietych only %}
+  </section>
+  {% endfor %}
+
+  <section class="karta" style="max-width:820px">
+    <h2>Zatwierdzenie</h2>
+    <div>
+      <label for="opis">Opis poprawki (trafi do studentów, np. „poprawiony test test_odwracanie_graniczne”)</label>
+      <textarea id="opis" name="opis" rows="3"></textarea>
+    </div>
+    <div>
+      <label><input type="checkbox" name="autoscalanie" value="1" checked> scalaj automatycznie, gdy nie ma konfliktu</label>
+      <p class="male drugie">Odznacz, jeśli każdy student ma scalić poprawkę sam (dostanie pull request „Poprawka prowadzącego”).
+        Przy konflikcie student zawsze scala sam. Pliki testów są używane w ocenie od razu, także przed scaleniem.</p>
+    </div>
+    <div class="przyciski">
+      <button class="glowny" type="submit" data-czekaj="Zlecam">Zatwierdzam: wprowadź poprawkę w zaznaczonych grupach</button>
+      <a class="przycisk" href="{% url 'panel:zestaw' zestaw.pk %}">Anuluj</a>
+    </div>
+  </section>
+</form>
+{% else %}
+<div class="karta">
+  <h2>Brak zmian</h2>
+  <p>Repozytorium źródłowe jest takie samo jak stan startowy {% if bez_zmian|length == 1 %}grupy{% else %}grup{% endif %}, więc nie ma czego
+    wprowadzać i nic nie zostało zmienione. Najpierw wprowadź poprawkę w repozytorium źródłowym (commit i push), potem otwórz tę stronę ponownie.</p>
+</div>
+{% endif %}
+
+{% if pakiety and bez_zmian %}<p class="male drugie">Bez zmian (stan startowy taki sam jak źródło): {% for p in bez_zmian %}{{ p.grupa.nazwa }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+{% if pominiete %}<p class="male drugie">Pominięte: {% for p, powod in pominiete %}{{ p.grupa.nazwa }} ({{ powod }}){% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+
+{% if historia %}
+<section class="karta">
+  <h2>Wcześniejsze poprawki{% if w_toku %} <span class="male drugie">(strona odświeża się sama)</span>{% endif %}</h2>
+  <table class="tabela">
+    <tr><th>Grupa</th><th>Nr</th><th>Data</th><th>Opis</th><th>Stan</th></tr>
+    {% for p in historia %}
+    <tr class="klik" data-href="{% url 'panel:poprawka' p.pk %}"><td>{{ p.przydzial.grupa.nazwa }}</td>
+      <td><a href="{% url 'panel:poprawka' p.pk %}">{{ p.numer }}</a></td>
+      <td class="male">{{ p.utworzono|date:"d.m.Y H:i" }}</td><td class="male">{{ p.opis|truncatechars:100 }}</td>
+      <td><span class="znacznik {% if p.stan == 'gotowa' %}zielony{% elif p.stan == 'blad' %}czerwony{% elif p.w_toku %}niebieski{% else %}szary{% endif %}">{{ p.get_stan_display }}</span></td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+{% endblock %}
