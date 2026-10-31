@@ -51,7 +51,7 @@ def test_pokaz_na_kazdym_poziomie(client, github, prowadzacy, przydzial):
     uslugi.akceptuj(p5, 98, "jan", "Jan Kot")
     strona = client.get("/panel/studenci/").content.decode()
     # Grupy domyslnie zwiniete; "pokaz" na poziomie uczelni, roku i przedmiotu rozwija wszystkie ich grupy
-    assert strona.count("data-przelacz-grupy") == 3 and strona.count('class="przycisk maly przelacznik"') == 2
+    assert strona.count("data-przelacz-grupy") == 3 and strona.count('class="karta rozwijana grupa-studentow"') == 2
     assert 'grupa-studentow" open' not in strona and "Ewa Lis" in strona and "Jan Kot" in strona
     # Zakres z adresu dalej dziala (np. z zakladki), wtedy grupy sa rozwiniete
     strona = client.get(f"/panel/studenci/?grupa={g5.pk}").content.decode()

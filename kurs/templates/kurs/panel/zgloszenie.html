@@ -130,8 +130,8 @@
       </div>
     </div>
 
-    <div class="karta">
-      <h2>Wypchnięcia</h2>
+    <details class="karta rozwijana">
+      <summary><h2>Wypchnięcia <span class="drugie male">{{ wypchniecia|length }}</span></h2></summary>
       {% if wypchniecia %}
       <table class="tabela male">
         <tr><th>Czas</th><th>Stan</th><th>Kto</th></tr>
@@ -142,7 +142,7 @@
         {% endfor %}
       </table>
       {% else %}<p class="slabe">Brak zarejestrowanych wypchnięć.</p>{% endif %}
-    </div>
+    </details>
 
     {% if z.repo_nazwa %}
     <div class="karta">

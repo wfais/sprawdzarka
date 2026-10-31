@@ -180,9 +180,13 @@ details.rozwijana[open] > summary { margin-bottom: 14px; }
 .kolumna-oceny { width: 1%; white-space: nowrap; }
 .tabela-oceny .stan-zestawu { margin-top: 1px; }
 /* Oceny: kolumny wyroznione delikatnym tlem (pionowe pasy) */
+.tabela-oceny .waska { width: 1%; white-space: nowrap; }
+.tabela-oceny .kolumna-przyjete { background: color-mix(in srgb, var(--zolty-tlo) 60%, transparent); }
 .tabela-oceny .kolumna-ocena { background: color-mix(in srgb, var(--niebieski-tlo) 55%, transparent); }
 .tabela-oceny .kolumna-zakonczone { background: color-mix(in srgb, var(--zielony-tlo) 55%, transparent); }
-.tabela-oceny th.kolumna-ocena, .tabela-oceny th.kolumna-zakonczone { color: var(--tekst); }
+.tabela-oceny .kolumna-przyjete, .tabela-oceny .kolumna-ocena, .tabela-oceny .kolumna-zakonczone { padding-left: 16px; padding-right: 16px; }
+.tabela-oceny th.kolumna-przyjete, .tabela-oceny th.kolumna-ocena, .tabela-oceny th.kolumna-zakonczone { color: var(--tekst); }
+.tabela-oceny td.kolumna-przyjete b { font-variant-numeric: tabular-nums; }
 .ocena-w-kolumnie { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .ocena-w-kolumnie .ulamek { font-variant-numeric: tabular-nums; min-width: 42px; }
 
@@ -428,9 +432,5 @@ td .pomoc-terminu { display: flex; margin-top: 4px; }
 .poziom-uczelni { margin-top: 26px; padding-bottom: 8px; border-bottom: 2px solid var(--linia-mocna); }
 .poziom-uczelni:first-of-type { margin-top: 8px; }
 .grupa-studentow > summary { gap: 12px; }
-.grupa-studentow > summary .przycisk { margin-left: auto; }
-details.rozwijana.grupa-studentow > summary::after, details.rozwijana.grupa-studentow[open] > summary::after { content: none; }
-.przelacznik::after { content: "pokaż"; }
-details[open] > summary .przelacznik::after { content: "ukryj"; }
 .poziom-studentow button, .sekcja-roku .przyciski button { min-width: 64px; justify-content: center; }
 .zakres-studentow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }

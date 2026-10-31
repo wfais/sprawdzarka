@@ -9,16 +9,17 @@
   <h2>Zestawy w grupach</h2>
   {% if przydzialy %}
   <table class="tabela tabela-oceny">
-    <tr><th>Zestaw</th><th>Przedmiot i grupa</th><th>Stan</th><th>Termin ostateczny</th><th class="liczba" title="Przyjęte zaproszenia (założone repozytoria)">Przyjęte</th>
-      <th class="kolumna-ocena" title="Prace ocenione automatycznie (testy i modele) / prace z oddanym kodem">Ocena</th>
-      <th class="kolumna-zakonczone" title="Prace z wystawioną oceną ostateczną / wszystkie przyjęte">Zakończone</th></tr>
+    <tr><th>Zestaw</th><th>Przedmiot i grupa</th><th class="waska">Stan</th><th class="waska">Termin ostateczny</th>
+      <th class="waska liczba kolumna-przyjete" title="Przyjęte zaproszenia (założone repozytoria)">Przyjęte</th>
+      <th class="waska kolumna-ocena" title="Prace ocenione automatycznie (testy i modele) / prace z oddanym kodem">Oceny</th>
+      <th class="waska kolumna-zakonczone" title="Prace z wystawioną oceną ostateczną / wszystkie przyjęte">Zakończone</th></tr>
     {% for p in przydzialy %}
     <tr>
       <td><a href="{% url 'panel:przydzial' p.pk %}"><strong>{{ p.zestaw.nazwa }}</strong></a>{% if p.zestaw.kolokwium %}<div><span class="znacznik fiolet">kolokwium</span></div>{% endif %}</td>
       <td>{{ p.zestaw.kurs.nazwa }}<div class="male drugie">{{ p.grupa.nazwa }} · {{ p.zestaw.kurs.rok.nazwa }}</div></td>
       <td>{% include "kurs/panel/_stan_zestawu.html" %}</td>
       <td class="nowrap male">{{ p.termin_twardy|date:"d.m.Y H:i" }}</td>
-      <td class="liczba">{{ p.lacznie }}</td>
+      <td class="liczba kolumna-przyjete"><b>{{ p.lacznie }}</b></td>
       <td class="kolumna-ocena"><div class="ocena-w-kolumnie"><b class="ulamek">{{ p.ocenione_automatycznie }}/{{ p.z_kodem }}</b>
         {% if p.w_toku %}<span class="male drugie">w toku {{ p.w_toku }}</span>{% endif %}
         {% if p.do_oceny_automatycznie %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}" class="w-linii"
@@ -29,7 +30,7 @@
     </tr>
     {% endfor %}
   </table>
-  <p class="drugie male" style="margin-top:10px">Ocena: prace ocenione automatycznie (testy i modele) z wszystkich z oddanym kodem;
+  <p class="drugie male" style="margin-top:10px">Oceny: prace ocenione automatycznie (testy i modele) z wszystkich z oddanym kodem;
     „Oceń” ocenia pozostałe. Zakończone: prace z Twoją oceną ostateczną z wszystkich przyjętych (bez kodu: 0 pkt).
     Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo licznik w kolumnie „Zakończone”).
     Tu są przedmioty widoczne na pulpicie.</p>

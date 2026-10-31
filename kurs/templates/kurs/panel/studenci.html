@@ -53,8 +53,7 @@
   </div>
   {% for g in k.grupy %}
   <details class="karta rozwijana grupa-studentow"{% if q or filtr or zakres %} open{% endif %}>
-    <summary><h2>{{ g.grupa.nazwa }} <span class="drugie male">{% if g.grupa.opis %}{{ g.grupa.opis }} · {% endif %}osób: {{ g.wiersze|length }}</span></h2>
-      <span class="przycisk maly przelacznik" aria-hidden="true"></span></summary>
+    <summary><h2>{{ g.grupa.nazwa }} <span class="drugie male">{% if g.grupa.opis %}{{ g.grupa.opis }} · {% endif %}osób: {{ g.wiersze|length }}</span></h2></summary>
     <div class="przewijanie">
     <table class="tabela tabela-studentow">
       <tr><th class="lp">Lp.</th><th>Imię i nazwisko</th><th>Konto GitHub</th>
