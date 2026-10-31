@@ -13,7 +13,7 @@
     <a class="przycisk glowny" href="{% url 'panel:zestaw_nowy' kurs.pk %}">Nowy zestaw</a>
     <a class="przycisk" href="{% url 'panel:zestaw_nowy' kurs.pk %}?rodzaj=kolokwium">Nowe kolokwium</a>
     {% endif %}
-    <a class="przycisk" href="{% url 'panel:kurs_edycja' kurs.pk %}">Edytuj</a>
+    <a class="przycisk edytuj" href="{% url 'panel:kurs_edycja' kurs.pk %}">Edytuj</a>
     <form method="post" action="{% url 'panel:kurs_ukryj' kurs.pk %}" class="w-linii">{% csrf_token %}
       <button type="submit">{% if kurs.ukryty %}Pokaż na pulpicie{% else %}Ukryj{% endif %}</button></form>
     <a class="przycisk" href="{% url 'panel:kurs_kopiuj' kurs.pk %}" title="Np. na kolejny rok akademicki: wszystkie zestawy i kolokwia z zadaniami i kryteriami">Kopiuj do innego roku</a>

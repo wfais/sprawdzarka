@@ -9,7 +9,7 @@
       {% elif rok.ukryty %}<span class="znacznik szary">ukryty na pulpicie</span>{% endif %}</p>
   </div>
   <div class="przyciski">
-    <a class="przycisk" href="{% url 'panel:rok_edycja' rok.pk %}">Edytuj</a>
+    <a class="przycisk edytuj" href="{% url 'panel:rok_edycja' rok.pk %}">Edytuj</a>
     <form method="post" action="{% url 'panel:rok_ukryj' rok.pk %}" class="w-linii">{% csrf_token %}
       <button type="submit">{% if rok.ukryty %}Pokaż na pulpicie{% else %}Ukryj cały rok{% endif %}</button></form>
     {% if rok.poligon %}

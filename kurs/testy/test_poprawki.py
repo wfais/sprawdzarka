@@ -199,4 +199,4 @@ def test_poprawka_dla_wszystkich_grup_zestawu(client, github, prowadzacy, przydz
     strona = client.get(f"/panel/zestawy/{zestaw.pk}/poprawka/").content.decode()
     assert "Wcześniejsze korekty" in strona and "odświeża się sama" in strona and "tylko ta grupa" not in strona
     strona = client.get(f"/panel/zestawy/{zestaw.pk}/").content.decode()
-    assert f"/panel/zestawy/{zestaw.pk}/poprawka/" in strona and "Korekta treści" in strona and ">Ustawienia</a>" in strona
+    assert f"/panel/zestawy/{zestaw.pk}/poprawka/" in strona and "Korekta treści" in strona and ">Edytuj</a>" in strona

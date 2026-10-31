@@ -12,7 +12,7 @@
       {% with p=przydzial %}{% include "kurs/panel/_stan_zestawu.html" %}{% endwith %}
       <span>termin oddania <b>{{ przydzial.termin_miekki|date:"d.m.Y H:i" }}</b></span>
       <span>ostateczny <b>{{ przydzial.termin_twardy|date:"d.m.Y H:i" }}</b></span>
-      <a class="przycisk maly" href="{% url 'panel:przydzial_edycja' przydzial.pk %}">Edycja terminów</a>
+      <a class="przycisk maly edytuj" href="{% url 'panel:przydzial_edycja' przydzial.pk %}">Edycja terminów</a>
     </div>
     {% if przydzial.repo_zrodlowe %}<p class="meta"><span>inne repozytorium źródłowe <a class="mono" href="https://github.com/{{ przydzial.repo_zrodlowe }}" target="_blank" rel="noopener">{{ przydzial.repo_zrodlowe }}</a></span></p>{% endif %}
   </div>

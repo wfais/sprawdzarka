@@ -4,7 +4,7 @@
       <h3><a href="{% url 'panel:grupa' grupa.pk %}">{{ grupa.nazwa }}</a>{% if not grupa.aktywna %} <span class="znacznik szary">nieaktywna</span>{% endif %}</h3>
       {% if grupa.opis %}<span class="zajecia">{{ grupa.opis }}</span>{% endif %}
     </div>
-    {% if edycja %}<a class="male" href="{% url 'panel:grupa_edycja' grupa.pk %}">ustawienia</a>{% endif %}
+    {% if edycja %}<a class="przycisk maly edytuj" href="{% url 'panel:grupa_edycja' grupa.pk %}">Edytuj</a>{% endif %}
   </div>
   <div class="cialo">
     {% for p in grupa.lista %}{% include "kurs/panel/_przydzial_wiersz.html" %}

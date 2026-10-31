@@ -9,7 +9,7 @@
     <section class="karta">
       <div class="pasek-karty">
         <h2><span class="plakietka">{{ u.skrot|upper }}</span>{{ u.nazwa }}</h2>
-        <a class="przycisk maly" href="{% url 'panel:uczelnia_edycja' u.pk %}">Edytuj</a>
+        <a class="przycisk maly edytuj" href="{% url 'panel:uczelnia_edycja' u.pk %}">Edytuj</a>
       </div>
       {% for r in u.lata.all %}
         <div class="rok-uczelni{% if r.ukryty or r.zarchiwizowany %} wyciszony{% endif %}">

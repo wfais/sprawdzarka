@@ -8,7 +8,7 @@
       · kod: <code>{{ zestaw.wzorce_kodu }}</code> · {{ zestaw.punkty_max|floatformat:"-2" }} pkt
       {% if zestaw.tresc_pdf %}· <a href="{% url 'panel:zestaw_pdf' zestaw.pk %}">treść PDF</a>{% endif %}</p>
   </div>
-  <div class="przyciski">{% block akcje_zestawu %}{% endblock %}{% if przydzialy and not zestaw.kurs.zarchiwizowany %}<a class="przycisk" href="{% url 'panel:zestaw_poprawka' zestaw.pk %}" title="Przenieś zmiany z repozytorium źródłowego do repozytoriów studentów wybranych grup (najpierw podgląd)">Korekta treści</a>{% endif %}<a class="przycisk" href="{% url 'panel:zestaw_kopiuj' zestaw.pk %}" title="Np. do tego samego przedmiotu w kolejnym roku: z zadaniami i kryteriami">Kopiuj do innego przedmiotu</a><a class="przycisk" href="{% url 'panel:zestaw_edycja' zestaw.pk %}">Edytuj</a></div>
+  <div class="przyciski">{% block akcje_zestawu %}{% endblock %}{% if przydzialy and not zestaw.kurs.zarchiwizowany %}<a class="przycisk" href="{% url 'panel:zestaw_poprawka' zestaw.pk %}" title="Przenieś zmiany z repozytorium źródłowego do repozytoriów studentów wybranych grup (najpierw podgląd)">Korekta treści</a>{% endif %}<a class="przycisk" href="{% url 'panel:zestaw_kopiuj' zestaw.pk %}" title="Np. do tego samego przedmiotu w kolejnym roku: z zadaniami i kryteriami">Kopiuj do innego przedmiotu</a><a class="przycisk edytuj" href="{% url 'panel:zestaw_edycja' zestaw.pk %}">Edytuj</a></div>
 </div>
 
 <div class="siatka-2">
@@ -49,7 +49,7 @@
 </div>
 <div class="karta">
   <div class="pasek-karty"><h2>Zadania i kryteria oceny</h2>
-    <a class="przycisk maly glowny" href="{% url 'panel:zestaw_zadania' zestaw.pk %}" title="Zadania, punkty, sposób oceny i kryteria">Ustawienia</a></div>
+    <a class="przycisk maly edytuj" href="{% url 'panel:zestaw_zadania' zestaw.pk %}" title="Zadania, punkty, sposób oceny i kryteria">Edytuj</a></div>
   <div class="naglowek" style="margin-bottom:10px">
     <div>
       <p class="drugie male" style="margin:0">Na tej podstawie działają testy i modele oceniające.

@@ -279,6 +279,10 @@ button:active, .przycisk:active { background: var(--karta-2); box-shadow: inset 
 button.glowny, .przycisk.glowny { background: linear-gradient(var(--plyta-2), var(--plyta)); border-color: #0b1116; color: #f1f5f8;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 rgba(0, 0, 0, .08); }
 button.glowny:hover, .przycisk.glowny:hover { filter: brightness(1.15); border-color: #0b1116; }
+/* Przyciski edycji: lekko zabarwione */
+.przycisk.edytuj { background: var(--niebieski-tlo); color: var(--niebieski);
+  border-color: color-mix(in srgb, var(--akcent) 35%, var(--linia-mocna)); }
+.przycisk.edytuj:hover { border-color: var(--akcent); }
 button.niebezpieczny { color: var(--czerwony); border-color: color-mix(in srgb, var(--led-czerwony) 40%, var(--linia)); }
 button.maly, .przycisk.maly { height: 28px; padding: 0 10px; font-size: 13.5px; }
 button.link { border: none; background: none; box-shadow: none; color: var(--drugi); padding: 0; height: auto; font-weight: 400; }

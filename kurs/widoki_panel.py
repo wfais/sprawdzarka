@@ -677,7 +677,7 @@ def grupa_edycja(request, pk):
         messages.success(request, "Zapisano zmiany grupy.")
         return redirect("panel:grupa", pk=grupa.pk)
     return render(request, "kurs/panel/formularz.html", {
-        "tytul": f"Ustawienia grupy: {grupa}", "formularz": formularz, "przycisk": "Zapisz", "wstecz_obiekt": grupa,
+        "tytul": f"Edycja grupy: {grupa}", "formularz": formularz, "przycisk": "Zapisz", "wstecz_obiekt": grupa,
         **_usuwanie(grupa, "panel:grupa_usun", "Usunięcie grupy razem z wydanymi jej zestawami i zgłoszeniami "
                                               "studentów. Repozytoria na GitHubie zostają."),
     })
