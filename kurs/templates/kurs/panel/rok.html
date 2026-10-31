@@ -30,11 +30,11 @@
 </div>
 {% if rok.poligon %}
 <div class="uwaga poligon-uwaga">Poligon: dane fikcyjne do prób, bez połączenia z GitHubem. Cały poligon usuniesz w
-  <a href="{% url 'panel:administracja' %}">Administracji</a>.</div>
+  <a href="{% url 'panel:ustawienia' %}">Ustawieniach</a>.</div>
 {% endif %}
 {% if rok.zarchiwizowany %}
 <div class="uwaga">Rok zarchiwizowany: tylko do odczytu. Robot nie synchronizuje jego repozytoriów i nie ocenia zgłoszeń.
-  Pobierz plik archiwum i zachowaj go. Po pobraniu możesz usunąć rok z bazy, a później wczytać go z pliku w strukturze.</div>
+  Pobierz plik archiwum i zachowaj go. Po pobraniu możesz usunąć rok z bazy, a później wczytać go z pliku w Ustawieniach.</div>
 {% endif %}
 
 <div class="siatka-2">

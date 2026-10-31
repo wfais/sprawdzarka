@@ -58,7 +58,8 @@
   --niebieski-tlo: #e0ebfa; --niebieski: #1f5aa3;
   --szary-tlo: #e8ecef;   --szary: #4d5b69;
   --fiolet-tlo: #efe6fd;  --fiolet: #6a2fb3;
-  --promien: 7px;
+  --promien: 0;  /* ostre narozniki; zaokraglone zostaja tylko diody i elementy z diodami */
+  --pasek-karty: #dfe5eb;
   --czcionka: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --naglowki: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
   --mono: ui-monospace, "Cascadia Code", Consolas, "Liberation Mono", monospace;
@@ -68,7 +69,7 @@
   :root {
     --tlo: #10161c; --karta: #171f27; --karta-2: #1c2630; --tekst: #e3e9ee; --drugi: #a9b5c0; --slaby: #75828e;
     --linia: #27323d; --linia-mocna: #36434f; --akcent: #8db9f2; --akcent-tlo: #1d3350; --akcent-tekst: #0f1d2e;
-    --plyta: #0b1015; --plyta-2: #1a242e; --oprawka: #05080b;
+    --plyta: #0b1015; --plyta-2: #1a242e; --oprawka: #05080b; --pasek-karty: #222c37;
     --zielony-tlo: #173322; --zielony: #9fe0ae;
     --zolty-tlo: #3a3011;   --zolty: #f2d679;
     --pomaranczowy-tlo: #42291a; --pomaranczowy: #f8bb8c;
@@ -86,7 +87,7 @@ body { background: var(--tlo); color: var(--tekst); font: 400 15.5px/1.5 var(--c
   -webkit-font-smoothing: antialiased; font-variant-numeric: lining-nums; }
 a { color: var(--akcent); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 2px; }
-:focus-visible { outline: 2px solid var(--akcent); outline-offset: 2px; border-radius: 3px; }
+:focus-visible { outline: 2px solid var(--akcent); outline-offset: 2px; }
 code, .mono { font-family: var(--mono); font-size: 13px; }
 b, strong { font-weight: 600; }
 h1 { font: 600 29px/1.15 var(--naglowki); letter-spacing: .002em; margin: 0 0 6px; }
@@ -129,7 +130,8 @@ p { margin: 0 0 10px; }
 /* liczniki prac z dioda */
 .liczniki, .paski { display: flex; flex-wrap: wrap; gap: 6px; }
 .licznik { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 8px; font-size: 13px; color: var(--drugi);
-  border: 1px solid var(--linia); border-radius: 6px; background: var(--karta); white-space: nowrap; }
+  border: 1px solid var(--linia); background: var(--karta); white-space: nowrap; }
+.licznik:has(.dioda) { border-radius: 6px; }
 .licznik b { color: var(--tekst); font-variant-numeric: tabular-nums; }
 a.licznik:hover { text-decoration: none; border-color: var(--linia-mocna); background: var(--karta-2); }
 .licznik.aktywny { border-color: var(--tekst); box-shadow: inset 0 0 0 1px var(--tekst); color: var(--tekst); }
@@ -138,7 +140,8 @@ a.licznik:hover { text-decoration: none; border-color: var(--linia-mocna); backg
 /* kafelki prac na liscie studentow */
 .kafelki { display: flex; flex-wrap: wrap; gap: 5px; }
 .kafelek { display: inline-flex; align-items: center; gap: 7px; padding: 2px 9px 2px 7px; font-size: 12.5px; color: var(--tekst);
-  border: 1px solid var(--linia); border-radius: 5px; background: var(--karta-2); font-family: var(--mono); }
+  border: 1px solid var(--linia); background: var(--karta-2); font-family: var(--mono); }
+.kafelek:has(.dioda) { border-radius: 5px; }
 a.kafelek:hover { text-decoration: none; border-color: var(--linia-mocna); background: var(--karta); }
 
 /* --- Pasek gorny: plyta czolowa --- */
@@ -152,7 +155,7 @@ a.kafelek:hover { text-decoration: none; border-color: var(--linia-mocna); backg
 .pasek nav a { display: inline-flex; align-items: center; color: var(--plyta-tekst); font-weight: 500; position: relative; }
 .pasek nav a:hover { color: #fff; text-decoration: none; }
 .pasek nav a.aktywny { color: #fff; }
-.pasek nav a.aktywny::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px;
+.pasek nav a.aktywny::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
   background: var(--led-zielony); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--led-zielony) 70%, transparent); }
 .pasek button.link { color: var(--plyta-tekst); }
 .pasek button.link:hover { color: #fff; }
@@ -169,7 +172,7 @@ a.kafelek:hover { text-decoration: none; border-color: var(--linia-mocna); backg
 .okruszki a { color: var(--drugi); }
 .okruszki .znacznik { margin-left: 6px; }
 .plakietka { display: inline-block; font: 600 13px/1 var(--naglowki); letter-spacing: .04em; color: var(--drugi);
-  padding: 4px 6px 3px; border: 1px solid var(--linia-mocna); border-radius: 4px; background: var(--karta);
+  padding: 4px 6px 3px; border: 1px solid var(--linia-mocna); background: var(--karta);
   box-shadow: inset 0 -1px 0 var(--linia); vertical-align: 4px; margin-right: 8px; }
 .kod-przedmiotu { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--drugi); }
 details.rozwijana > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; }
@@ -178,6 +181,8 @@ details.rozwijana > summary h2 { margin: 0; color: var(--tekst); }
 details.rozwijana > summary::after { content: "+"; font: 500 20px/1 var(--czcionka); color: var(--slaby); }
 details.rozwijana[open] > summary::after { content: "\2212"; }
 details.rozwijana[open] > summary { margin-bottom: 14px; }
+.tabela-oceny td { vertical-align: top; }
+.tabela-oceny .stan-zestawu { margin-top: 1px; }
 
 /* Sekcje roku na pulpicie */
 .sekcja-roku { margin-top: 30px; }
@@ -189,17 +194,33 @@ details.rozwijana[open] > summary { margin-bottom: 14px; }
 /* Poligon: tasma ostrzegawcza nad sekcja z danymi fikcyjnymi */
 .sekcja-roku.poligon > .naglowek { position: relative; padding-top: 14px; }
 .sekcja-roku.poligon > .naglowek::before, .karta-poligonu::before { content: ""; position: absolute; left: 0; right: 0; top: 0;
-  height: 5px; border-radius: 3px; background: repeating-linear-gradient(135deg, var(--led-zolty) 0 9px, var(--plyta) 9px 18px); }
+  height: 5px; background: repeating-linear-gradient(135deg, var(--led-zolty) 0 9px, var(--plyta) 9px 18px); }
 .karta-poligonu { position: relative; overflow: hidden; padding-top: 22px; }
-.karta-poligonu::before { border-radius: 0; }
 .strefa-usuwania { border-color: color-mix(in srgb, var(--led-czerwony) 30%, var(--linia)); }
 .przycisk.niebezpieczny { color: var(--czerwony); border-color: color-mix(in srgb, var(--led-czerwony) 40%, var(--linia)); }
 
 /* Karty */
-.karta { background: var(--karta); border: 1px solid var(--linia); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+.karta { background: var(--karta); border: 1px solid var(--linia); padding: 18px 20px; margin-bottom: 16px; }
+/* Nazwa panelu w pasku naglowka: jasnoszary pasek, czarny napis */
+.karta > h2:first-child, .karta > .pasek-karty { margin: -18px -20px 14px; padding: 10px 20px 9px;
+  background: var(--pasek-karty); border-bottom: 1px solid var(--linia); color: var(--tekst); }
+.karta > .pasek-karty { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.karta > .pasek-karty h2 { margin: 0; }
+.karta-poligonu > h2:first-child { margin-top: -17px; }
+details.karta.rozwijana > summary { margin: -18px -20px 0; padding: 10px 20px 9px; background: var(--pasek-karty); }
+details.karta.rozwijana:not([open]) { padding-bottom: 0; }
+details.karta.rozwijana[open] > summary { border-bottom: 1px solid var(--linia); }
+details.karta.rozwijana > summary:hover h2 { color: var(--akcent); }
+/* Uczelnie, przedmioty, grupy, zestawy: lata akademickie w karcie uczelni */
+.rok-uczelni { padding: 12px 0 6px; border-top: 1px solid var(--linia); }
+.karta > .pasek-karty + .rok-uczelni { border-top: none; padding-top: 0; }
+.przedmioty-roku { display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: 14.5px; margin: 0 0 6px; }
+.przedmiot-w-roku { margin: 6px 0 10px; }
+.przedmiot-w-roku > h4 { font-size: 15px; font-weight: 600; margin: 8px 0 2px; }
+.przedmiot-w-roku > h4 a { color: var(--tekst); }
 .karta.ostrzezenie { border-left: 4px solid var(--led-czerwony); }
 .karta-grupy { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-.karta-grupy > .glowa { padding: 12px 18px 11px; background: var(--karta-2); border-bottom: 1px solid var(--linia);
+.karta-grupy > .glowa { padding: 12px 18px 11px; background: var(--pasek-karty); border-bottom: 1px solid var(--linia);
   display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .karta-grupy > .glowa h3 { margin: 0; font: 600 18px/1.2 var(--naglowki); }
 .karta-grupy > .glowa .zajecia { display: block; color: var(--drugi); font-size: 13.5px; margin-top: 2px; }
@@ -226,7 +247,7 @@ tr.nowy-wiersz:focus-within { opacity: 1; }
 .metryka .wartosc { font: 600 22px/1.2 var(--naglowki); }
 
 /* Znaczniki (pomocnicze etykiety) */
-.znacznik { display: inline-block; padding: 1px 8px; border-radius: 5px; font-size: 12.5px; font-weight: 500; white-space: nowrap; line-height: 1.6; }
+.znacznik { display: inline-block; padding: 1px 8px; font-size: 12.5px; font-weight: 500; white-space: nowrap; line-height: 1.6; }
 .znacznik.zielony { background: var(--zielony-tlo); color: var(--zielony); }
 .znacznik.zolty { background: var(--zolty-tlo); color: var(--zolty); }
 .znacznik.pomaranczowy { background: var(--pomaranczowy-tlo); color: var(--pomaranczowy); }
@@ -318,7 +339,7 @@ details summary { cursor: pointer; color: var(--drugi); }
 .student-tlo { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
 .student-marka { display: flex; align-items: center; gap: 10px; font: 600 19px/1 var(--naglowki); color: var(--drugi);
   margin-bottom: 18px; width: 100%; max-width: 580px; }
-.student-karta { background: var(--karta); border: 1px solid var(--linia); border-radius: 12px; padding: 28px 30px; width: 100%; max-width: 580px; }
+.student-karta { background: var(--karta); border: 1px solid var(--linia); padding: 28px 30px; width: 100%; max-width: 580px; }
 .student-karta .kroki { padding-left: 20px; margin: 8px 0 14px; }
 .student-karta .kroki li { margin-bottom: 10px; }
 .student-stopka { font-size: 13px; color: var(--slaby); margin-top: 20px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }

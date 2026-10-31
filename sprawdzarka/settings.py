@@ -85,6 +85,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "kurs.kontekst.statyka",
+                "kurs.kontekst.sekcja_panelu",
             ],
         },
     },

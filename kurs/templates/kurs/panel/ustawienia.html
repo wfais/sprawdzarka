@@ -1,0 +1,96 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Ustawienia{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Ustawienia</h1>
+  <p class="podtytul">Modele oceniające, dostęp do panelu, archiwa lat akademickich, poligon do prób i bezpośredni dostęp do danych.</p></div></div>
+
+<section class="karta" id="modele">
+  <h2>Modele oceniające</h2>
+  <p class="drugie male">Lista pochodzi z pliku <code>.env</code> (zmienna <code>OCENIAJACE_MODELE</code>), klucze API też są tylko tam.
+    Testy uruchamiane są w trybie <code>{{ tryb_testow }}</code>.</p>
+  <table class="tabela">
+    <tr><th>Model</th><th>Dostawca</th><th>Klucz API</th><th></th></tr>
+    {% for m in modele %}
+    <tr>
+      <td class="mono">{{ m.identyfikator }}</td><td>{{ m.dostawca }}</td>
+      <td>{% if m.skonfigurowany %}<span class="znacznik zielony">jest</span>{% else %}<span class="znacznik czerwony">brak</span>{% endif %}</td>
+      <td><form method="post" action="{% url 'panel:modele_sprawdz' %}">{% csrf_token %}
+        <input type="hidden" name="model" value="{{ m.identyfikator }}">
+        <button class="maly" type="submit" data-czekaj="Sprawdzam">Sprawdź połączenie</button></form></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="puste">Brak skonfigurowanych modeli. Ocena będzie się opierać tylko na testach.</td></tr>
+    {% endfor %}
+  </table>
+  {% for b in bledne %}<p class="blad-tekst">Niepoprawny wpis: {{ b }}</p>{% endfor %}
+  {% if tryb_testow == "lokalnie" %}
+  <div class="uwaga" style="margin-top:12px">Testy działają w trybie <strong>lokalnie</strong>: kod studentów uruchamia się na koncie, na którym działa serwis,
+  z dostępem do plików (w tym <code>.env</code> i klucza aplikacji GitHub) oraz do sieci. Używaj tego trybu wyłącznie do prób
+  na własnych przykładach. Prace studentów testuj w trybie <code>kolejka</code> (usługa <code>tester</code> w Dockerze).</div>
+  {% endif %}
+  <details style="margin-top:12px">
+    <summary>Jak skonfigurować modele</summary>
+    <p style="margin-top:8px">W pliku <code>.env</code> wpisz listę modeli w postaci <code>dostawca:nazwa</code> oraz klucze, np.:</p>
+<pre class="mono" style="white-space:pre-wrap">OCENIAJACE_MODELE=anthropic:claude-sonnet-5-5,openai:NAZWA_MODELU,xai:NAZWA_MODELU,google:NAZWA_MODELU
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+XAI_API_KEY=...
+GEMINI_API_KEY=...
+# albo wszystkie przez jedną bramkę:
+OCENIAJACE_MODELE=openrouter:anthropic/NAZWA,openrouter:openai/NAZWA
+OPENROUTER_API_KEY=...
+# wypróbowanie bez kluczy:
+OCENIAJACE_MODELE=demo:a,demo:b,demo:c</pre>
+    <p class="drugie male">Dokładne nazwy modeli sprawdź w dokumentacji dostawcy. W ustawieniach zestawu możesz wybrać podzbiór modeli.</p>
+  </details>
+</section>
+
+<div class="siatka-polowy">
+  <section class="karta">
+    <h2>Dostęp do panelu</h2>
+    {% if konta_github %}
+    <p class="drugie">Konta GitHub, które mogą się zalogować{% if not github_wlaczony %} (brak GITHUB_APP_CLIENT_ID, logowanie nie zadziała){% endif %}:</p>
+    <ul class="lista-kont">{% for k, p in konta_github %}<li><code>@{{ k }}</code>
+      {% if p and p.ostatnie_logowanie %}<span class="slabe">ostatnio {{ p.ostatnie_logowanie|date:"j.m.Y H:i" }}</span>
+      {% else %}<span class="slabe">jeszcze się nie logowało</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="drugie">Logowanie przez GitHub jest wyłączone: brak kont w <code>PANEL_KONTA_GITHUB</code>.</p>
+    {% endif %}
+    <p class="drugie">Logowanie hasłem: <strong>{{ haslo|yesno:"włączone,wyłączone" }}</strong>{% if haslo %}, wstrzymywane na
+      {{ blokada_minut }} minut po {{ limit_prob }} nieudanych próbach{% endif %}.
+      Nieudane próby w ostatniej dobie: {{ nieudane }}.</p>
+    <p class="slabe">Zmiany w pliku <code>.env</code> (<code>PANEL_KONTA_GITHUB</code>, <code>PANEL_LOGOWANIE_HASLEM</code>) działają po ponownym uruchomieniu.</p>
+  </section>
+  <section class="karta" id="archiwum">
+    <h2>Wczytaj archiwum roku</h2>
+    <p class="drugie male">Plik pobrany przyciskiem „Pobierz archiwum” na stronie roku (ze wszystkimi przedmiotami). Wczytasz go, gdy tego roku nie ma w bazie
+      (np. na nowym serwerze albo po usunięciu roku z bazy).</p>
+    <form method="post" action="{% url 'panel:wczytaj_archiwum' %}" enctype="multipart/form-data" class="formularz">{% csrf_token %}
+      {{ f_importu.as_div }}
+      <button type="submit" data-czekaj="Wczytuję">Wczytaj</button>
+    </form>
+  </section>
+  <section class="karta karta-poligonu">
+    <h2>Poligon</h2>
+    {% if lata_poligonu %}
+    <p class="drugie">Fikcyjne dane do prób, bez połączenia z GitHubem:</p>
+    <ul>{% for r in lata_poligonu %}<li><a href="{% url 'panel:rok' r.pk %}">{{ r.pelna_nazwa }}</a>:
+      {% for k in r.kursy.all %}<a href="{% url 'panel:kurs' k.pk %}">{{ k.nazwa }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</li>{% endfor %}</ul>
+    <a class="przycisk niebezpieczny" href="{% url 'panel:poligon_usun' %}">Usuń poligon</a>
+    {% else %}
+    <p class="drugie">Fikcyjny rok na UJ z przedmiotami Język Python i Język C++: grupy, kilkadziesiąt osób, prace we wszystkich
+      stanach, wypchnięcia i oceny. Prawdziwych danych nie zmienia i nie łączy się z GitHubem, więc można go
+      utworzyć także przy prawdziwych danych. Usuniesz go w całości jednym przyciskiem.</p>
+    <form method="post" action="{% url 'panel:poligon_utworz' %}">{% csrf_token %}
+      <button type="submit" data-czekaj="Tworzę poligon">Utwórz poligon</button></form>
+    {% endif %}
+  </section>
+  <section class="karta">
+    <h2>Surowe dane</h2>
+    <p class="drugie">Panel Django: bezpośredni podgląd i edycja wszystkich tabel. Bez zabezpieczeń panelu prowadzącego
+      (usuwanie bez wpisywania nazwy), więc tylko awaryjnie.</p>
+    {% if uzytkownik_admin %}<a class="przycisk" href="{% url 'admin:index' %}">Otwórz panel Django</a>
+    {% else %}<p class="slabe">Wymaga konta administratora.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

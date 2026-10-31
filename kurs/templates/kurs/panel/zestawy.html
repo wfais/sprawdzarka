@@ -1,26 +1,56 @@
 {% extends "kurs/panel/baza.html" %}
 {% block tytul %}Zestawy{% endblock %}
 {% block tresc %}
-<div class="naglowek">
-  <div><h1>Zestawy</h1><p class="podtytul">Zestaw to Twoje repozytorium źródłowe z zadaniami. Wydajesz go grupom na stronie zestawu.</p></div>
-  <a class="przycisk glowny" href="{% url 'panel:zestaw_nowy' %}">Nowy zestaw</a>
-</div>
-<div class="karta przewijanie">
-  <table class="tabela">
-    <tr><th>Skrót</th><th>Nazwa</th><th>Repozytorium źródłowe</th><th>Kod</th><th class="liczba">Punkty</th><th class="liczba">Grupy</th><th>PDF</th></tr>
-    {% for z in zestawy %}
-    <tr class="klik" data-href="{% url 'panel:zestaw' z.pk %}">
-      <td><code>{{ z.skrot }}</code></td>
-      <td><a href="{% url 'panel:zestaw' z.pk %}">{{ z.nazwa }}</a></td>
-      <td class="mono">{{ z.repo_zrodlowe }}</td>
-      <td class="mono">{{ z.wzorce_kodu }}</td>
-      <td class="liczba">{{ z.punkty_max|floatformat:"-2" }}</td>
-      <td class="liczba">{{ z.liczba_grup }}</td>
-      <td>{% if z.tresc_pdf %}<a href="{% url 'panel:zestaw_pdf' z.pk %}">otwórz</a>{% else %}<span class="slabe">brak</span>{% endif %}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="7" class="puste">Brak zestawów.</td></tr>
-    {% endfor %}
-  </table>
+<div class="naglowek"><div><h1>Zestawy</h1>
+  <p class="podtytul">Zestawy zadań i kolokwia według przedmiotów. Grupom wydajesz je na stronie zestawu, z terminami dla każdej grupy.</p></div></div>
+<div class="siatka-2">
+  <div>
+  {% for u in uczelnie %}{% if u.lata.all %}
+    <section class="karta">
+      <div class="pasek-karty"><h2><span class="plakietka">{{ u.skrot|upper }}</span>{{ u.nazwa }}</h2></div>
+      {% for r in u.lata.all %}
+        <div class="rok-uczelni{% if r.ukryty or r.zarchiwizowany %} wyciszony{% endif %}">
+          {% include "kurs/panel/_naglowek_roku.html" %}
+          {% for k in r.kursy.all %}
+          <div class="przedmiot-w-roku{% if k.ukryty %} wyciszony{% endif %}">
+            <h4><a href="{% url 'panel:kurs' k.pk %}">{{ k.nazwa }}</a>{% if k.kod %} <span class="kod-przedmiotu">{{ k.kod }}</span>{% endif %}</h4>
+            <table class="tabela">
+              {% for z in k.zestawy.all %}
+              <tr class="klik" data-href="{% url 'panel:zestaw' z.pk %}">
+                <td style="width:90px"><code>{{ z.skrot }}</code></td>
+                <td><a href="{% url 'panel:zestaw' z.pk %}"><strong>{{ z.nazwa }}</strong></a>{% if z.kolokwium %} <span class="znacznik fiolet">kolokwium</span>{% endif %}</td>
+                <td class="drugie male"><span class="meta" style="margin:0"><span>punkty <b>{{ z.punkty_max|floatformat:"-2" }}</b></span><span>grupy <b>{{ z.liczba_grup }}</b></span></span></td>
+              </tr>
+              {% empty %}
+              <tr><td class="slabe">Brak zestawów i kolokwiów.</td></tr>
+              {% endfor %}
+            </table>
+          </div>
+          {% empty %}
+          <p class="slabe">Brak przedmiotów w tym roku.</p>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </section>
+  {% endif %}{% empty %}
+    <p class="puste">Brak uczelni. Najpierw dodaj uczelnię i rok akademicki w <a href="{% url 'panel:uczelnie' %}">Uczelniach</a>.</p>
+  {% endfor %}
+  </div>
+  <div>
+    <details class="karta rozwijana">
+      <summary><h2>Nowy zestaw lub kolokwium</h2></summary>
+      <form method="get" class="formularz">
+        <div><label for="nowy-kurs">Przedmiot:</label>
+          <select id="nowy-kurs" name="kurs" required>
+            <option value="">wybierz przedmiot</option>
+            {% for k in kursy_do_wyboru %}<option value="{{ k.pk }}">{{ k.pelna_nazwa }}</option>{% endfor %}
+          </select></div>
+        <div class="przyciski">
+          <button class="glowny" type="submit" name="rodzaj" value="zestaw">Nowy zestaw</button>
+          <button type="submit" name="rodzaj" value="kolokwium">Nowe kolokwium</button>
+        </div>
+      </form>
+    </details>
+  </div>
 </div>
 {% endblock %}

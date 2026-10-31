@@ -4,15 +4,14 @@
 <div class="naglowek">
   <div><h1>Pulpit</h1>
     <p class="podtytul">Bieżące przedmioty, grupy i stan oddawania.{% if ukrytych %}
-      Przedmioty ukryte i z lat zarchiwizowanych ({{ ukrytych }}) są w <a href="{% url 'panel:struktura' %}">strukturze</a>.{% endif %}</p></div>
-  <div class="przyciski"><a class="przycisk" href="{% url 'panel:struktura' %}">Struktura</a></div>
+      Przedmioty ukryte i z lat zarchiwizowanych ({{ ukrytych }}) są w <a href="{% url 'panel:przedmioty' %}">Przedmiotach</a>.{% endif %}</p></div>
 </div>
 
 {% if brak_kursow %}
 <div class="karta">
   <h2>Pierwsze kroki</h2>
   <ol>
-    <li>W <a href="{% url 'panel:struktura' %}">strukturze</a> dodaj rok akademicki (np. 2026/2027), a na jego stronie przedmiot (np. „Język Python”).</li>
+    <li>W <a href="{% url 'panel:uczelnie' %}">Uczelniach</a> dodaj rok akademicki (np. 2026/2027), a w <a href="{% url 'panel:przedmioty' %}">Przedmiotach</a> przedmiot (np. „Język Python”).</li>
     <li>Na stronie przedmiotu dodaj grupy (np. „Grupa nr 3” ze skrótem g3) oraz zestawy zadań i kolokwia.</li>
     <li>Wydaj zestaw grupie z terminami. Każda grupa dostanie własny link i własne repozytorium startowe.
       Tym samym zestawem z innymi terminami obdzielisz kolejne grupy przyciskiem „Kopiuj do innych grup”.</li>
@@ -56,6 +55,6 @@
   </div>
 </section>
 {% empty %}
-  {% if not brak_kursow %}<p class="puste">Wszystkie przedmioty są ukryte albo zarchiwizowane. <a href="{% url 'panel:struktura' %}">Struktura</a></p>{% endif %}
+  {% if not brak_kursow %}<p class="puste">Wszystkie przedmioty są ukryte albo zarchiwizowane. <a href="{% url 'panel:przedmioty' %}">Przedmioty</a></p>{% endif %}
 {% endfor %}
 {% endblock %}

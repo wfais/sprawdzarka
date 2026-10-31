@@ -1,0 +1,4 @@
+<div class="naglowek" style="margin-bottom:4px">
+  <h3 style="margin:0"><a href="{% url 'panel:rok' r.pk %}">{{ r.nazwa }}</a>{% if r.poligon %} <span class="znacznik zolty">dane fikcyjne</span>{% endif %}</h3>
+  {% include "kurs/panel/_stan_roku.html" %}
+</div>

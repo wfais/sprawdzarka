@@ -1,5 +1,6 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import widoki_panel as w
 
@@ -10,9 +11,15 @@ urlpatterns = [
     path("logowanie/", w.LogowanieProwadzacego.as_view(), name="logowanie"),
     path("logowanie/github/", w.logowanie_github, name="logowanie_github"),
     path("wyloguj/", auth_views.LogoutView.as_view(), name="wyloguj"),
-    path("struktura/", w.struktura, name="struktura"),
-    path("struktura/wczytaj/", w.struktura_import, name="struktura_import"),
-    path("administracja/", w.administracja, name="administracja"),
+    # Menu: Pulpit, Uczelnie, Przedmioty, Grupy, Studenci, Zestawy, Oceny, Ustawienia
+    path("uczelnie/", w.uczelnie, name="uczelnie"),
+    path("przedmioty/", w.przedmioty, name="przedmioty"),
+    path("oceny/", w.oceny, name="oceny"),
+    path("ustawienia/", w.ustawienia, name="ustawienia"),
+    path("ustawienia/wczytaj-archiwum/", w.wczytaj_archiwum, name="wczytaj_archiwum"),
+    # Dawne adresy (zakladki w przegladarce)
+    path("struktura/", RedirectView.as_view(pattern_name="panel:uczelnie"), name="struktura"),
+    path("administracja/", RedirectView.as_view(pattern_name="panel:ustawienia"), name="administracja"),
     path("poligon/utworz/", w.poligon_utworz, name="poligon_utworz"),
     path("poligon/usun/", w.poligon_usun, name="poligon_usun"),
     path("uczelnie/<int:pk>/", w.uczelnia_edycja, name="uczelnia_edycja"),

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import user_passes_test
-from django.db.models import Count, Max, Prefetch, Q
+from django.db.models import Count, F, Max, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -21,7 +21,8 @@ from .github import klient as gh
 from . import struktura as kopiowanie
 from .forms import (
     FormularzeKopiiPrzydzialu, FormularzeZadan, FormularzEdycjiPrzydzialu, FormularzGrupy, FormularzImportu,
-    FormularzKopiiKursu, FormularzKopiiZestawu, FormularzKursu, FormularzNazwiska, FormularzOceny, FormularzPrecedensu,
+    FormularzKopiiKursu, FormularzKopiiZestawu, FormularzKursu, FormularzNazwiska, FormularzNowejGrupy, FormularzOceny,
+    FormularzPrecedensu,
     FormularzPrzydzialu, FormularzRoku, FormularzUczelni, FormularzWyjatku, FormularzZestawu,
 )
 from .models import (
@@ -118,26 +119,38 @@ def _kursy_z_licznikami():
     ).order_by("nazwa")
 
 
+def _uczelnie_z_latami(kursy: Prefetch):
+    """Uczelnie z latami akademickimi (poligon na koncu, najnowsze lata na gorze) i przedmiotami lat."""
+    lata = Rok.objects.order_by("poligon", "-nazwa").prefetch_related(kursy)
+    return Uczelnia.objects.prefetch_related(Prefetch("lata", queryset=lata))
+
+
 @prowadzacy
-def struktura(request):
+def uczelnie(request):
     rodzaj = request.POST.get("rodzaj") if request.method == "POST" else None
     f_uczelni = FormularzUczelni(request.POST if rodzaj == "uczelnia" else None, prefix="u")
     f_roku = FormularzRoku(request.POST if rodzaj == "rok" else None, prefix="r")
-    f_kursu = FormularzKursu(request.POST if rodzaj == "kurs" else None, prefix="k")
-    for nazwa, formularz in [("uczelnia", f_uczelni), ("rok", f_roku), ("kurs", f_kursu)]:
+    for nazwa, formularz in [("uczelnia", f_uczelni), ("rok", f_roku)]:
         if rodzaj == nazwa and formularz.is_valid():
             obj = formularz.save()
             messages.success(request, f"Dodano: {obj}.")
-            if nazwa == "rok":
-                return redirect("panel:rok", pk=obj.pk)
-            if nazwa == "kurs":
-                return redirect("panel:kurs", pk=obj.pk)
-            return redirect("panel:struktura")
-    lata = Rok.objects.order_by("poligon", "-nazwa").prefetch_related(Prefetch("kursy", queryset=_kursy_z_licznikami()))
-    uczelnie = Uczelnia.objects.prefetch_related(Prefetch("lata", queryset=lata))
-    return render(request, "kurs/panel/struktura.html", {
-        "uczelnie": uczelnie, "f_uczelni": f_uczelni, "f_kursu": f_kursu, "f_roku": f_roku,
-        "f_importu": FormularzImportu(),
+            return redirect("panel:rok", pk=obj.pk) if nazwa == "rok" else redirect("panel:uczelnie")
+    return render(request, "kurs/panel/uczelnie.html", {
+        "uczelnie": _uczelnie_z_latami(Prefetch("kursy", queryset=Kurs.objects.order_by("nazwa"))),
+        "f_uczelni": f_uczelni, "f_roku": f_roku,
+    })
+
+
+@prowadzacy
+def przedmioty(request):
+    formularz = FormularzKursu(request.POST or None, prefix="k")
+    if request.method == "POST" and formularz.is_valid():
+        kurs = formularz.save()
+        messages.success(request, f"Dodano przedmiot {kurs.pelna_nazwa}.")
+        return redirect("panel:kurs", pk=kurs.pk)
+    return render(request, "kurs/panel/przedmioty.html", {
+        "uczelnie": _uczelnie_z_latami(Prefetch("kursy", queryset=_kursy_z_licznikami())),
+        "formularz": formularz,
     })
 
 
@@ -148,9 +161,9 @@ def uczelnia_edycja(request, pk):
     if request.method == "POST" and formularz.is_valid():
         formularz.save()
         messages.success(request, "Zapisano zmiany uczelni.")
-        return redirect("panel:struktura")
+        return redirect("panel:uczelnie")
     return render(request, "kurs/panel/formularz.html", {
-        "tytul": f"Uczelnia: {uczelnia}", "formularz": formularz, "przycisk": "Zapisz", "wstecz": "panel:struktura",
+        "tytul": f"Uczelnia: {uczelnia}", "formularz": formularz, "przycisk": "Zapisz", "wstecz": "panel:uczelnie",
         **_usuwanie(uczelnia, "panel:uczelnia_usun", "Usunięcie uczelni, która nie ma lat akademickich."),
     })
 
@@ -252,7 +265,7 @@ def rok_usun(request, pk):
                 messages.success(request, f"Usunięto z bazy: {opis}.")
             else:
                 messages.success(request, f"Usunięto z bazy: {opis}. Odtworzysz go z pliku archiwum.")
-            return redirect("panel:struktura")
+            return redirect("panel:uczelnie")
     return render(request, "kurs/panel/rok_usun.html", {
         "rok": rok,
         "zgloszen": Zgloszenie.objects.filter(przydzial__zestaw__kurs__rok=rok).count(),
@@ -336,10 +349,10 @@ def poligon_utworz(request):
         rok = poligon.utworz()
     except poligon.BladPoligonu as blad:
         messages.error(request, str(blad))
-        return redirect("panel:administracja")
+        return redirect("panel:ustawienia")
     messages.success(request, f"Poligon gotowy: {rok.pelna_nazwa} ("
                      + ", ".join(k.nazwa for k in rok.kursy.all())
-                     + "). To dane fikcyjne, nie łączą się z GitHubem. Usuniesz je w całości w Administracji.")
+                     + "). To dane fikcyjne, nie łączą się z GitHubem. Usuniesz je w całości w Ustawieniach.")
     return redirect("panel:pulpit")
 
 
@@ -348,7 +361,7 @@ def poligon_usun(request):
     lata = list(Rok.objects.filter(poligon=True))
     if not lata:
         messages.info(request, "Poligonu nie ma.")
-        return redirect("panel:administracja")
+        return redirect("panel:ustawienia")
     if request.method == "POST":
         if request.POST.get("potwierdzenie", "").strip() != poligon.SKROT_ROKU:
             messages.error(request, f"Aby usunąć, wpisz dokładnie: {poligon.SKROT_ROKU}")
@@ -356,7 +369,7 @@ def poligon_usun(request):
             wynik = poligon.usun()
             messages.success(request, f"Poligon usunięty: przedmioty {wynik['przedmiotow']}, zgłoszenia "
                                       f"{wynik['zgloszen']}, fikcyjne konta studentów {wynik['studentow']}.")
-            return redirect("panel:administracja")
+            return redirect("panel:ustawienia")
     zgloszen = Zgloszenie.objects.filter(przydzial__zestaw__kurs__rok__in=lata).count()
     kursy = _kursy_z_licznikami().filter(rok__in=lata).select_related("rok")
     return render(request, "kurs/panel/usun.html", {
@@ -367,7 +380,7 @@ def poligon_usun(request):
                   + [f"zgłoszenia fikcyjnych studentów: {zgloszen}, z wypchnięciami i ocenami",
                      "fikcyjne konta studentów"],
         "uwaga": "Prawdziwe lata, przedmioty, grupy i studenci zostają bez zmian.",
-        "potwierdzenie": poligon.SKROT_ROKU, "przycisk": "Usuń poligon", "wstecz": reverse("panel:administracja"),
+        "potwierdzenie": poligon.SKROT_ROKU, "przycisk": "Usuń poligon", "wstecz": reverse("panel:ustawienia"),
     })
 
 
@@ -409,7 +422,7 @@ def uczelnia_usun(request, pk):
         return f"Usunięto uczelnię {nazwa}."
     return _potwierdz_usuniecie(
         request, uczelnia, tytul=f"Usuń uczelnię: {uczelnia.nazwa}", punkty=[f"uczelnia {uczelnia.nazwa}"],
-        potwierdzenie=uczelnia.skrot, wykonaj=wykonaj, po=reverse("panel:struktura"),
+        potwierdzenie=uczelnia.skrot, wykonaj=wykonaj, po=reverse("panel:uczelnie"),
         wstecz=reverse("panel:uczelnia_edycja", args=[pk]))
 
 
@@ -539,43 +552,77 @@ def logowanie_github(request):
     return redirect(gh.adres_autoryzacji(settings.PUBLICZNY_ADRES + reverse("student:powrot"), stan))
 
 
-# --- Administracja ---
+# --- Ustawienia: modele, dostep do panelu, archiwum roku, poligon ---
 
 @prowadzacy
-def administracja(request):
+def ustawienia(request):
     od = timezone.now() - timedelta(days=1)
     powiazane = {k.login.lower(): k for k in KontoProwadzacego.objects.all()}
-    return render(request, "kurs/panel/administracja.html", {
+    modele = oceniacze.skonfigurowane()
+    return render(request, "kurs/panel/ustawienia.html", {
+        "modele": modele, "tryb_testow": settings.SPRAWDZARKA_TESTY,
+        "bledne": [m for m in settings.SPRAWDZARKA_MODELE if m not in {x.identyfikator for x in modele}],
         "lata_poligonu": Rok.objects.filter(poligon=True).select_related("uczelnia").prefetch_related("kursy"),
         "uzytkownik_admin": request.user.is_superuser,
         "konta_github": [(k, powiazane.get(k)) for k in settings.PANEL_KONTA_GITHUB],
         "github_wlaczony": logowanie.github_wlaczony(), "haslo": settings.PANEL_LOGOWANIE_HASLEM,
         "limit_prob": settings.PANEL_LIMIT_PROB, "blokada_minut": settings.PANEL_BLOKADA_MINUT,
         "nieudane": NieudaneLogowanie.objects.filter(czas__gte=od).count(),
+        "f_importu": FormularzImportu(),
     })
+
+
+def _do_ustawien(kotwica: str):
+    return redirect(reverse("panel:ustawienia") + kotwica)
 
 
 @prowadzacy
 @require_POST
-def struktura_import(request):
+def wczytaj_archiwum(request):
     formularz = FormularzImportu(request.POST, request.FILES)
     if not formularz.is_valid():
         messages.error(request, "Wybierz plik archiwum.")
-        return redirect("panel:struktura")
+        return _do_ustawien("#archiwum")
     try:
         rok = archiwum.wczytaj_plik(formularz.cleaned_data["plik"].read())
     except archiwum.BladArchiwum as blad:
         messages.error(request, f"Nie wczytano archiwum: {blad}")
-        return redirect("panel:struktura")
+        return _do_ustawien("#archiwum")
     messages.success(request, f"Wczytano z archiwum: {rok}.")
     return redirect("panel:rok", pk=rok.pk)
 
 
+def modele(request):
+    """Dawny adres strony modeli: teraz sekcja Ustawien."""
+    return _do_ustawien("#modele")
+
+
 # --- Grupy ---
+
+def _grupy_z_licznikami():
+    return Grupa.objects.annotate(
+        liczba_zestawow=Count("przydzialy", filter=Q(przydzialy__zestaw__rodzaj=Zestaw.Rodzaj.ZESTAW), distinct=True),
+        liczba_kolokwiow=Count("przydzialy", filter=Q(przydzialy__zestaw__rodzaj=Zestaw.Rodzaj.KOLOKWIUM), distinct=True),
+    ).order_by("nazwa")
+
 
 @prowadzacy
 def grupy(request):
-    return redirect("panel:struktura")
+    formularz = FormularzNowejGrupy(request.POST or None, prefix="g")
+    if request.method == "POST" and formularz.is_valid():
+        grupa = formularz.save()
+        messages.success(request, f"Dodano grupę {grupa.nazwa} ({grupa.kurs.pelna_nazwa}).")
+        return redirect("panel:grupa", pk=grupa.pk)
+    kursy = Kurs.objects.order_by("nazwa").prefetch_related(Prefetch("grupy", queryset=_grupy_z_licznikami()))
+    uczelnie = list(_uczelnie_z_latami(Prefetch("kursy", queryset=kursy)))
+    studenci = dict(Zgloszenie.objects.exclude(status=Zgloszenie.Status.WYZEROWANE).values("przydzial__grupa_id")
+                    .annotate(n=Count("student", distinct=True)).values_list("przydzial__grupa_id", "n"))
+    for u in uczelnie:
+        for r in u.lata.all():
+            for k in r.kursy.all():
+                for g in k.grupy.all():
+                    g.liczba_studentow = studenci.get(g.pk, 0)
+    return render(request, "kurs/panel/grupy.html", {"uczelnie": uczelnie, "formularz": formularz})
 
 
 @prowadzacy
@@ -630,7 +677,19 @@ def _odczytaj_pdf(request, zestaw, formularz):
 
 @prowadzacy
 def zestawy(request):
-    return redirect("panel:struktura")
+    if "kurs" in request.GET:
+        kurs = Kurs.objects.filter(pk=request.GET.get("kurs") or 0, rok__zarchiwizowany=False).first()
+        if kurs:
+            kolokwium = "?rodzaj=kolokwium" if request.GET.get("rodzaj") == "kolokwium" else ""
+            return redirect(reverse("panel:zestaw_nowy", args=[kurs.pk]) + kolokwium)
+        messages.error(request, "Wybierz przedmiot.")
+    lista = Zestaw.objects.annotate(liczba_grup=Count("przydzialy")).order_by("-rodzaj", "skrot")
+    kursy = Kurs.objects.order_by("nazwa").prefetch_related(Prefetch("zestawy", queryset=lista))
+    return render(request, "kurs/panel/zestawy.html", {
+        "uczelnie": _uczelnie_z_latami(Prefetch("kursy", queryset=kursy)),
+        "kursy_do_wyboru": Kurs.objects.filter(rok__zarchiwizowany=False).select_related("rok__uczelnia")
+                           .order_by("rok__poligon", "-rok__nazwa", "nazwa"),
+    })
 
 
 @prowadzacy
@@ -1305,6 +1364,8 @@ def przydzial_ocen(request, pk):
         messages.success(request, f"Dodano do kolejki oceny: {licznik}. Wyniki pojawią się w kolumnie „Ocena automatyczna”.")
     else:
         messages.info(request, "Nie ma nowych prac do oceny (oceniane są prace z oddanym kodem i otwartym pull requestem).")
+    if request.POST.get("nastepny") == "oceny":
+        return redirect("panel:oceny")
     return redirect("panel:przydzial", pk=pk)
 
 
@@ -1372,15 +1433,6 @@ def ewaluacja_zatwierdz(request, pk):
 
 
 @prowadzacy
-def modele(request):
-    lista = oceniacze.skonfigurowane()
-    bledne = [m for m in settings.SPRAWDZARKA_MODELE if m not in {x.identyfikator for x in lista}]
-    return render(request, "kurs/panel/modele.html", {
-        "modele": lista, "bledne": bledne, "tryb_testow": settings.SPRAWDZARKA_TESTY,
-    })
-
-
-@prowadzacy
 @require_POST
 def modele_sprawdz(request):
     identyfikator = request.POST.get("model", "")
@@ -1394,25 +1446,62 @@ def modele_sprawdz(request):
             messages.success(request, f"{identyfikator}: działa ({odp.czas_s:.1f} s).")
     except oceniacze.BladModelu as blad:
         messages.error(request, f"{identyfikator}: {blad}")
-    return redirect("panel:modele")
+    return _do_ustawien("#modele")
+
+
+# Kolejnosc stanow oceny automatycznej: dla zgloszenia liczy sie najlepszy
+_STAN_OCENY = {"gotowe": 0, "w_toku": 1, "bledy": 2}
+_W_TOKU = {Ewaluacja.Status.OCZEKUJE, Ewaluacja.Status.TESTY, Ewaluacja.Status.MODELE}
+
+
+def _przydzialy_do_oceny():
+    """Zestawy w grupach z oddanymi pracami (z lat i przedmiotow widocznych na pulpicie):
+    ocena automatyczna aktualnej wersji kodu, prace do decyzji prowadzacego i wyslane oceny."""
+    przydzialy = [p for p in _dolacz_liczniki(
+        Przydzial.objects.filter(zestaw__kurs__ukryty=False, zestaw__kurs__rok__ukryty=False,
+                                 zestaw__kurs__rok__zarchiwizowany=False)
+        .select_related("zestaw__kurs__rok__uczelnia", "grupa")) if p.lacznie]
+    mapa = {p.pk: p for p in przydzialy}
+    for p in przydzialy:
+        p.automatyczne = dict.fromkeys(_STAN_OCENY, 0)
+        p.wyslane = 0
+    aktywne = Zgloszenie.objects.filter(przydzial_id__in=mapa).exclude(status=Zgloszenie.Status.WYZEROWANE)
+    for pk, zamkniety in aktywne.values_list("przydzial_id", "pr_zamkniety"):
+        mapa[pk].wyslane += zamkniety
+    najlepsze = {}
+    for zgl, pk, status in (Ewaluacja.objects.filter(zgloszenie__in=aktywne, sha=F("zgloszenie__sha_oceniany"))
+                            .values_list("zgloszenie_id", "zgloszenie__przydzial_id", "status")):
+        stan = "gotowe" if status == Ewaluacja.Status.GOTOWA else "w_toku" if status in _W_TOKU else "bledy"
+        if zgl not in najlepsze or _STAN_OCENY[stan] < _STAN_OCENY[najlepsze[zgl][1]]:
+            najlepsze[zgl] = (pk, stan)
+    for pk, stan in najlepsze.values():
+        mapa[pk].automatyczne[stan] += 1
+    przydzialy.sort(key=lambda p: (p.do_oceny == 0, p.zestaw.kurs.rok.poligon, p.termin_twardy))
+    return przydzialy
 
 
 @prowadzacy
-def kalibracja(request):
+def oceny(request):
     formularz = FormularzPrecedensu(request.POST or None)
     if request.method == "POST" and formularz.is_valid():
         formularz.save()
         messages.success(request, "Dodano regułę.")
-        return redirect("panel:kalibracja")
+        return redirect(reverse("panel:oceny") + "#kalibracja")
     zestaw_id = request.GET.get("zestaw")
     zestaw = Zestaw.objects.filter(pk=zestaw_id).first() if zestaw_id else None
-    return render(request, "kurs/panel/kalibracja.html", {
+    return render(request, "kurs/panel/oceny.html", {
+        "przydzialy": _przydzialy_do_oceny(),
         "precedensy": Precedens.objects.select_related("zestaw"),
         "formularz": formularz,
         "statystyki": ocena.statystyki_kalibracji(zestaw),
         "zestawy": Zestaw.objects.all(),
         "wybrany": zestaw,
     })
+
+
+def kalibracja(request):
+    """Dawny adres kalibracji: teraz sekcja strony Oceny."""
+    return redirect(reverse("panel:oceny") + "#kalibracja")
 
 
 @prowadzacy
@@ -1432,4 +1521,4 @@ def precedens_zmien(request, pk):
             precedens.tresc = tresc
             precedens.save(update_fields=["tresc"])
             messages.success(request, "Zapisano regułę.")
-    return redirect("panel:kalibracja")
+    return redirect(reverse("panel:oceny") + "#kalibracja")

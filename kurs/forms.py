@@ -114,6 +114,24 @@ class FormularzGrupy(_WKursie, forms.ModelForm):
         fields = ["nazwa", "skrot", "opis", "aktywna"]
 
 
+class FormularzNowejGrupy(FormularzGrupy):
+    """Nowa grupa ze strony Grupy: z wyborem przedmiotu (tylko lata niezarchiwizowane)."""
+
+    class Meta(FormularzGrupy.Meta):
+        fields = ["kurs", "nazwa", "skrot", "opis", "aktywna"]
+        labels = {"kurs": "Przedmiot"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["kurs"].queryset = (Kurs.objects.filter(rok__zarchiwizowany=False).select_related("rok__uczelnia")
+                                        .order_by("rok__poligon", "-rok__nazwa", "nazwa"))
+        self.fields["kurs"].label_from_instance = lambda k: k.pelna_nazwa
+
+    def clean_skrot(self):
+        self.kurs = self.cleaned_data.get("kurs")
+        return super().clean_skrot()
+
+
 class FormularzZestawu(_WKursie, forms.ModelForm):
     class Meta:
         model = Zestaw

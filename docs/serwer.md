@@ -151,7 +151,7 @@ Gdyby logowanie przez GitHub nie działało, awaryjnie: w `.env` `PANEL_LOGOWANI
 
 Od tej chwili pracujesz na serwerze. Na komputerze zostaje środowisko do prób (najlepiej na poligonie),
 a linki dla studentów wysyłasz tylko z serwera. Rok z komputera przeniesiesz przyciskiem „Pobierz archiwum”
-(strona roku) i „Wczytaj archiwum” (Struktura na serwerze); potem nie używaj go już na komputerze, żeby dwa roboty
+(strona roku) i „Wczytaj archiwum” (Ustawienia na serwerze); potem nie używaj go już na komputerze, żeby dwa roboty
 nie obsługiwały tych samych repozytoriów.
 
 ## Aktualizacja do nowej wersji

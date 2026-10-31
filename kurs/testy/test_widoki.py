@@ -102,7 +102,7 @@ def test_pelny_przebieg_panelu(client, github, prowadzacy):
     from kurs.models import Kurs, Rok, Uczelnia
     assert client.get("/panel/").status_code == 200
     uj = Uczelnia.objects.get(skrot="uj")
-    odp = client.post("/panel/struktura/", {"rodzaj": "rok", "r-uczelnia": uj.pk, "r-nazwa": "2026/2027", "r-skrot": ""})
+    odp = client.post("/panel/uczelnie/", {"rodzaj": "rok", "r-uczelnia": uj.pk, "r-nazwa": "2026/2027", "r-skrot": ""})
     assert odp.status_code == 302
     rok = Rok.objects.get(uczelnia=uj)
     assert rok.skrot == "2627"
@@ -218,7 +218,8 @@ def test_wszystkie_strony_panelu_sie_otwieraja(client, github, prowadzacy, przyd
     kurs = przydzial.zestaw.kurs
     rok = kurs.rok
     adresy = [
-        "/panel/", "/panel/struktura/", "/panel/administracja/", f"/panel/lata/{rok.pk}/", f"/panel/lata/{rok.pk}/edycja/",
+        "/panel/", "/panel/uczelnie/", "/panel/przedmioty/", "/panel/grupy/", "/panel/zestawy/", "/panel/oceny/",
+        f"/panel/oceny/?zestaw={przydzial.zestaw.pk}", "/panel/ustawienia/", f"/panel/lata/{rok.pk}/", f"/panel/lata/{rok.pk}/edycja/",
         f"/panel/kursy/{kurs.pk}/", f"/panel/kursy/{kurs.pk}/edycja/",
         f"/panel/kursy/{kurs.pk}/kopiuj/", f"/panel/kursy/{kurs.pk}/usun/",
         f"/panel/grupy/{przydzial.grupa.pk}/usun/", f"/panel/zestawy/{przydzial.zestaw.pk}/usun/",
@@ -238,9 +239,11 @@ def test_wszystkie_strony_panelu_sie_otwieraja(client, github, prowadzacy, przyd
     for adres in adresy:
         odp = client.get(adres)
         assert odp.status_code == 200, adres
-    # Dawne listy prowadza do struktury
-    assert client.get("/panel/grupy/")["Location"] == "/panel/struktura/"
-    assert client.get("/panel/zestawy/")["Location"] == "/panel/struktura/"
+    # Dawne adresy prowadza na nowe strony
+    assert client.get("/panel/struktura/")["Location"] == "/panel/uczelnie/"
+    assert client.get("/panel/administracja/")["Location"] == "/panel/ustawienia/"
+    assert client.get("/panel/modele/")["Location"] == "/panel/ustawienia/#modele"
+    assert client.get("/panel/kalibracja/")["Location"] == "/panel/oceny/#kalibracja"
 
 
 @pytest.mark.django_db
@@ -365,3 +368,41 @@ def test_edycja_opublikowanego_zostawia_date_publikacji(client, github, prowadza
     # Zaplanowana publikacja: pole od razu widoczne
     Przydzial.objects.filter(pk=przydzial.pk).update(publikacja=timezone.now() + timedelta(days=2))
     assert '<details class="pozniejsza-publikacja" open>' in client.get(adres).content.decode()
+
+
+@pytest.mark.django_db
+def test_menu_panelu(client, prowadzacy):
+    strona = client.get("/panel/grupy/").content.decode()
+    menu = strona[strona.index("<nav>"):strona.index("</nav>")]
+    pozycje = ["Pulpit", "Uczelnie", "Przedmioty", "Grupy", "Studenci", "Zestawy", "Oceny", "Ustawienia"]
+    assert [menu.index(f">{p}<") for p in pozycje] == sorted(menu.index(f">{p}<") for p in pozycje)
+    assert 'class="aktywny">Grupy<' in menu and "Struktura" not in menu and "Administracja" not in menu
+
+
+@pytest.mark.django_db
+def test_nowa_grupa_i_nowy_zestaw_z_list(client, prowadzacy, zestaw, grupa):
+    kurs = zestaw.kurs
+    odp = client.post("/panel/grupy/", {"g-kurs": kurs.pk, "g-nazwa": "Grupa nr 9", "g-skrot": "g9", "g-aktywna": "on"})
+    nowa = Grupa.objects.get(skrot="g9")
+    assert nowa.kurs == kurs and odp["Location"] == f"/panel/grupy/{nowa.pk}/"
+    odp = client.post("/panel/grupy/", {"g-kurs": kurs.pk, "g-nazwa": "Inna", "g-skrot": "g9"})
+    assert odp.status_code == 200 and "już użyty w tym przedmiocie" in odp.content.decode()
+    assert "Grupa nr 9" in client.get("/panel/grupy/").content.decode()
+    odp = client.get(f"/panel/zestawy/?kurs={kurs.pk}&rodzaj=kolokwium")
+    assert odp["Location"] == f"/panel/kursy/{kurs.pk}/nowy-zestaw/?rodzaj=kolokwium"
+    assert client.get(f"/panel/zestawy/?kurs={kurs.pk}&rodzaj=zestaw")["Location"] == f"/panel/kursy/{kurs.pk}/nowy-zestaw/"
+    assert zestaw.nazwa in client.get("/panel/zestawy/").content.decode()
+
+
+@pytest.mark.django_db
+def test_oceny_pokazuja_prace_do_decyzji(client, github, prowadzacy, przydzial):
+    from kurs import uslugi
+    assert "Nikt jeszcze nie oddał prac" in client.get("/panel/oceny/").content.decode()
+    z = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+    Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="c" * 40)
+    strona = client.get("/panel/oceny/").content.decode()
+    assert f"/panel/przydzialy/{przydzial.pk}/ocen/" in strona and "Oceń automatycznie" in strona
+    # Bez nowych prac do oceny przycisk wraca na liste Oceny
+    Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="")
+    odp = client.post(f"/panel/przydzialy/{przydzial.pk}/ocen/", {"nastepny": "oceny"})
+    assert odp["Location"] == "/panel/oceny/"

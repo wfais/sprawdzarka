@@ -12,13 +12,15 @@
   <a class="logo" href="{% url 'panel:pulpit' %}"><i class="dioda zielony" aria-hidden="true"></i>Sprawdzarka</a>
   {% if user.is_authenticated %}
   <nav>
-    {% with sciezka=request.path %}
-    <a href="{% url 'panel:pulpit' %}" {% if sciezka == '/panel/' %}class="aktywny"{% endif %}>Pulpit</a>
-    <a href="{% url 'panel:struktura' %}" {% if '/panel/struktura' in sciezka or '/panel/lata' in sciezka or '/panel/grupy' in sciezka or '/panel/zestawy' in sciezka or '/panel/przydzialy' in sciezka or '/panel/uczelnie' in sciezka or '/panel/kursy' in sciezka or '/panel/zgloszenia' in sciezka or '/panel/poprawki' in sciezka %}class="aktywny"{% endif %}>Struktura</a>
-    <a href="{% url 'panel:studenci' %}" {% if '/panel/studenci' in sciezka %}class="aktywny"{% endif %}>Studenci</a>
-    <a href="{% url 'panel:kalibracja' %}" {% if '/panel/kalibracja' in sciezka %}class="aktywny"{% endif %}>Kalibracja</a>
-    <a href="{% url 'panel:modele' %}" {% if '/panel/modele' in sciezka %}class="aktywny"{% endif %}>Modele</a>
-    <a href="{% url 'panel:administracja' %}" {% if '/panel/administracja' in sciezka or '/panel/poligon' in sciezka %}class="aktywny"{% endif %}>Administracja</a>
+    {% with s=sekcja_panelu %}
+    <a href="{% url 'panel:pulpit' %}"{% if s == "pulpit" %} class="aktywny"{% endif %}>Pulpit</a>
+    <a href="{% url 'panel:uczelnie' %}"{% if s == "uczelnie" %} class="aktywny"{% endif %}>Uczelnie</a>
+    <a href="{% url 'panel:przedmioty' %}"{% if s == "przedmioty" %} class="aktywny"{% endif %}>Przedmioty</a>
+    <a href="{% url 'panel:grupy' %}"{% if s == "grupy" %} class="aktywny"{% endif %}>Grupy</a>
+    <a href="{% url 'panel:studenci' %}"{% if s == "studenci" %} class="aktywny"{% endif %}>Studenci</a>
+    <a href="{% url 'panel:zestawy' %}"{% if s == "zestawy" %} class="aktywny"{% endif %}>Zestawy</a>
+    <a href="{% url 'panel:oceny' %}"{% if s == "oceny" %} class="aktywny"{% endif %}>Oceny</a>
+    <a href="{% url 'panel:ustawienia' %}"{% if s == "ustawienia" %} class="aktywny"{% endif %}>Ustawienia</a>
     {% endwith %}
   </nav>
   <form method="post" action="{% url 'panel:wyloguj' %}" class="w-linii">{% csrf_token %}

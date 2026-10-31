@@ -225,7 +225,7 @@ def test_zatwierdzenie_w_panelu_z_regula(client, prowadzacy, zgloszenie, modele,
     statystyki = ocena.statystyki_kalibracji()
     assert statystyki["zadan"] == 2 and statystyki["zmienione"] == 1
     assert statystyki["modele"]["anthropic:model-a"]["n"] == 2
-    assert client.get("/panel/kalibracja/").status_code == 200
+    assert client.get("/panel/oceny/").status_code == 200
 
 
 @pytest.mark.django_db
@@ -276,7 +276,7 @@ def test_propozycja_zadan_z_tresci(zgloszenie, modele, monkeypatch, client, prow
     assert [z.kod for z in zadania] == ["ZADANIE1", "ZADANIE2"]
     assert zadania[1].punkty == D(3) and zadania[1].tryb == Zadanie.Tryb.MODELE
     assert client.get(f"/panel/zestawy/{zestaw.pk}/zadania/").status_code == 200
-    assert client.get("/panel/modele/").status_code == 200
+    assert client.get("/panel/ustawienia/").status_code == 200
 
 
 @pytest.mark.django_db

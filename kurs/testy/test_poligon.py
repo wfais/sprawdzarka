@@ -63,7 +63,8 @@ def test_readme_po_terminie_nie_jest_spoznieniem(rok_poligonu):
 
 
 def test_panel_dziala_bez_githuba(client, prowadzacy, rok_poligonu):
-    adresy = ["/panel/", "/panel/struktura/", "/panel/studenci/"]
+    adresy = ["/panel/", "/panel/uczelnie/", "/panel/przedmioty/", "/panel/grupy/", "/panel/zestawy/", "/panel/oceny/",
+              "/panel/studenci/", "/panel/ustawienia/"]
     adresy.append(f"/panel/lata/{rok_poligonu.pk}/")
     adresy += [f"/panel/kursy/{k.pk}/" for k in rok_poligonu.kursy.all()]
     for g in Grupa.objects.filter(kurs__rok__poligon=True):

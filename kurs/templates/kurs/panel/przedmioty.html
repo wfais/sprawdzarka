@@ -1,0 +1,42 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Przedmioty{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Przedmioty</h1>
+  <p class="podtytul">Przedmioty według uczelni i lat akademickich. W przedmiocie są jego grupy, zestawy zadań i kolokwia.</p></div></div>
+<div class="siatka-2">
+  <div>
+  {% for u in uczelnie %}{% if u.lata.all %}
+    <section class="karta">
+      <div class="pasek-karty"><h2><span class="plakietka">{{ u.skrot|upper }}</span>{{ u.nazwa }}</h2></div>
+      {% for r in u.lata.all %}
+        <div class="rok-uczelni{% if r.ukryty or r.zarchiwizowany %} wyciszony{% endif %}">
+          {% include "kurs/panel/_naglowek_roku.html" %}
+          <table class="tabela">
+            {% for k in r.kursy.all %}
+            <tr class="klik{% if k.ukryty %} wyciszony{% endif %}" data-href="{% url 'panel:kurs' k.pk %}">
+              <td><a href="{% url 'panel:kurs' k.pk %}"><strong>{{ k.nazwa }}</strong></a>{% if k.kod %} <span class="kod-przedmiotu">{{ k.kod }}</span>{% endif %}</td>
+              <td class="drugie male"><span class="meta" style="margin:0"><span>grupy <b>{{ k.liczba_grup }}</b></span><span>zestawy <b>{{ k.liczba_zestawow }}</b></span><span>kolokwia <b>{{ k.liczba_kolokwiow }}</b></span></span></td>
+              <td style="text-align:right">{% if k.ukryty %}<span class="stan"><i class="dioda wylaczona" aria-hidden="true"></i>ukryty</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="slabe">Brak przedmiotów w tym roku.</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% endfor %}
+    </section>
+  {% endif %}{% empty %}
+    <p class="puste">Brak uczelni. Najpierw dodaj uczelnię i rok akademicki w <a href="{% url 'panel:uczelnie' %}">Uczelniach</a>.</p>
+  {% endfor %}
+  </div>
+  <div>
+    <details class="karta rozwijana"{% if formularz.errors %} open{% endif %}>
+      <summary><h2>Nowy przedmiot</h2></summary>
+      <form method="post" class="formularz">{% csrf_token %}
+        {{ formularz.as_div }}
+        <button class="glowny" type="submit">Dodaj przedmiot</button>
+      </form>
+    </details>
+  </div>
+</div>
+{% endblock %}

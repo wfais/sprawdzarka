@@ -1,4 +1,4 @@
-"""Usuwanie z potwierdzeniem nazwy oraz strona Administracja."""
+"""Usuwanie z potwierdzeniem nazwy oraz strona Ustawienia."""
 import pytest
 
 from kurs import uslugi
@@ -7,9 +7,9 @@ from kurs.models import Grupa, Kurs, Przydzial, Rok, Uczelnia, Zestaw, Zgloszeni
 
 @pytest.mark.django_db
 def test_administracja_ma_poligon(client, prowadzacy):
-    strona = client.get("/panel/administracja/").content.decode()
+    strona = client.get("/panel/ustawienia/").content.decode()
     assert "Utwórz poligon" in strona and "panel Django" in strona
-    assert "Utwórz poligon" not in client.get("/panel/struktura/").content.decode()
+    assert "Utwórz poligon" not in client.get("/panel/uczelnie/").content.decode()
 
 
 @pytest.mark.django_db

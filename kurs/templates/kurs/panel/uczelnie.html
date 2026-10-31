@@ -1,0 +1,45 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Uczelnie{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Uczelnie</h1>
+  <p class="podtytul">Uczelnie i ich lata akademickie. Przedmioty są w <a href="{% url 'panel:przedmioty' %}">Przedmiotach</a>,
+    grupy w <a href="{% url 'panel:grupy' %}">Grupach</a>, zestawy i kolokwia w <a href="{% url 'panel:zestawy' %}">Zestawach</a>.</p></div></div>
+<div class="siatka-2">
+  <div>
+  {% for u in uczelnie %}
+    <section class="karta">
+      <div class="pasek-karty">
+        <h2><span class="plakietka">{{ u.skrot|upper }}</span>{{ u.nazwa }}</h2>
+        <a class="przycisk maly" href="{% url 'panel:uczelnia_edycja' u.pk %}">Edytuj</a>
+      </div>
+      {% for r in u.lata.all %}
+        <div class="rok-uczelni{% if r.ukryty or r.zarchiwizowany %} wyciszony{% endif %}">
+          {% include "kurs/panel/_naglowek_roku.html" %}
+          <p class="przedmioty-roku">{% for k in r.kursy.all %}<a href="{% url 'panel:kurs' k.pk %}"{% if k.ukryty %} class="wyciszony" title="ukryty na pulpicie"{% endif %}>{{ k.nazwa }}</a>{% empty %}<span class="slabe">Brak przedmiotów.</span>{% endfor %}</p>
+        </div>
+      {% empty %}
+        <p class="slabe">Brak lat akademickich. Dodaj rok przyciskiem „Nowy rok akademicki”.</p>
+      {% endfor %}
+    </section>
+  {% empty %}
+    <p class="puste">Brak uczelni. Dodaj uczelnię przyciskiem „Nowa uczelnia”.</p>
+  {% endfor %}
+  </div>
+  <div>
+    <details class="karta rozwijana"{% if f_uczelni.errors %} open{% endif %}>
+      <summary><h2>Nowa uczelnia</h2></summary>
+      <form method="post" class="formularz">{% csrf_token %}<input type="hidden" name="rodzaj" value="uczelnia">
+        {{ f_uczelni.as_div }}
+        <button class="glowny" type="submit">Dodaj uczelnię</button>
+      </form>
+    </details>
+    <details class="karta rozwijana"{% if f_roku.errors %} open{% endif %}>
+      <summary><h2>Nowy rok akademicki</h2></summary>
+      <form method="post" class="formularz">{% csrf_token %}<input type="hidden" name="rodzaj" value="rok">
+        {{ f_roku.as_div }}
+        <button class="glowny" type="submit">Dodaj rok</button>
+      </form>
+    </details>
+  </div>
+</div>
+{% endblock %}

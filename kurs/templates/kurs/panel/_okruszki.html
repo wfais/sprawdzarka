@@ -1,5 +1,5 @@
 {% with r1=kurs.rok r2=rok %}{% with r=r1|default:r2 %}
-<div class="okruszki"><a href="{% url 'panel:struktura' %}">Struktura</a>
+<div class="okruszki"><a href="{% url 'panel:uczelnie' %}">Uczelnie</a>
   › {{ r.uczelnia.skrot|upper }}
   {% if not tylko_uczelnia %}› <a href="{% url 'panel:rok' r.pk %}">{{ r.nazwa }}</a>{% endif %}
   {% if kurs and not bez_kursu %}› <a href="{% url 'panel:kurs' kurs.pk %}">{{ kurs.nazwa }}</a>{% endif %}

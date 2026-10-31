@@ -146,7 +146,7 @@ def test_ukryty_rok_znika_z_pulpitu(client, prowadzacy, przydzial):
     rok.refresh_from_db()
     assert rok.ukryty
     assert "Grupa 4" not in client.get("/panel/").content.decode()
-    assert "ukryty" in client.get("/panel/struktura/").content.decode()
+    assert "ukryty" in client.get("/panel/uczelnie/").content.decode()
     client.post(f"/panel/lata/{rok.pk}/ukryj/")
     assert "Grupa 4" in client.get("/panel/").content.decode()
 
@@ -251,29 +251,29 @@ def test_wczytanie_archiwum_z_panelu(client, github, prowadzacy, przydzial):
     odp = client.post(f"/panel/lata/{rok.pk}/usun/", {"potwierdzenie": "zle"})
     assert Rok.objects.filter(pk=rok.pk).exists()
     odp = client.post(f"/panel/lata/{rok.pk}/usun/", {"potwierdzenie": "2026/2027"})
-    assert odp["Location"] == "/panel/struktura/" and not Rok.objects.exists()
-    odp = client.post("/panel/struktura/wczytaj/", {"plik": SimpleUploadedFile("a.json", tresc)})
+    assert odp["Location"] == "/panel/uczelnie/" and not Rok.objects.exists()
+    odp = client.post("/panel/ustawienia/wczytaj-archiwum/", {"plik": SimpleUploadedFile("a.json", tresc)})
     nowy = Rok.objects.get()
     assert odp["Location"] == f"/panel/lata/{nowy.pk}/"
     assert Zgloszenie.objects.count() == 1
-    odp = client.post("/panel/struktura/wczytaj/", {"plik": SimpleUploadedFile("a.json", b"{zle")}, follow=True)
+    odp = client.post("/panel/ustawienia/wczytaj-archiwum/", {"plik": SimpleUploadedFile("a.json", b"{zle")}, follow=True)
     assert "nie jest poprawnym plikiem JSON" in odp.content.decode()
 
 
 @pytest.mark.django_db
 def test_struktura_dodaje_uczelnie_rok_i_przedmiot(client, prowadzacy):
-    client.post("/panel/struktura/", {"rodzaj": "uczelnia", "u-nazwa": "Politechnika", "u-skrot": "pk",
+    client.post("/panel/uczelnie/", {"rodzaj": "uczelnia", "u-nazwa": "Politechnika", "u-skrot": "pk",
                                       "u-kolejnosc": "3"})
     from kurs.models import Uczelnia
     pk = Uczelnia.objects.get(skrot="pk")
-    odp = client.post("/panel/struktura/", {"rodzaj": "rok", "r-uczelnia": pk.pk, "r-nazwa": "2026/2027"})
+    odp = client.post("/panel/uczelnie/", {"rodzaj": "rok", "r-uczelnia": pk.pk, "r-nazwa": "2026/2027"})
     rok = Rok.objects.get(uczelnia=pk)
     assert odp["Location"] == f"/panel/lata/{rok.pk}/" and rok.skrot == "2627"
     # Ten sam rok drugi raz: blad, nic nie powstaje
-    odp = client.post("/panel/struktura/", {"rodzaj": "rok", "r-uczelnia": pk.pk, "r-nazwa": "2026/2027"})
+    odp = client.post("/panel/uczelnie/", {"rodzaj": "rok", "r-uczelnia": pk.pk, "r-nazwa": "2026/2027"})
     assert odp.status_code == 200 and Rok.objects.filter(uczelnia=pk).count() == 1
-    odp = client.post("/panel/struktura/", {"rodzaj": "kurs", "k-rok": rok.pk, "k-nazwa": "Język C++", "k-skrot": "cpp",
-                                            "k-kod": "WFAIS.IF-A207.0"})
+    odp = client.post("/panel/przedmioty/", {"k-rok": rok.pk, "k-nazwa": "Język C++", "k-skrot": "cpp",
+                                             "k-kod": "WFAIS.IF-A207.0"})
     kurs = Kurs.objects.get(skrot="cpp")
     assert odp["Location"] == f"/panel/kursy/{kurs.pk}/" and kurs.rok == rok
     # Przedmiot na stronie roku (bez wyboru roku), skrot unikalny w roku
@@ -281,8 +281,9 @@ def test_struktura_dodaje_uczelnie_rok_i_przedmiot(client, prowadzacy):
     assert odp.status_code == 200 and "już użyty w tym roku" in odp.content.decode()
     odp = client.post(f"/panel/lata/{rok.pk}/", {"k-nazwa": "Język C", "k-skrot": "c"})
     assert Kurs.objects.filter(rok=rok).count() == 2
-    strona = client.get("/panel/struktura/").content.decode()
+    strona = client.get("/panel/przedmioty/").content.decode()
     assert "Język C++" in strona and "Język C<" in strona
+    assert "Język C++" in client.get("/panel/uczelnie/").content.decode()
     assert "Język C++" in client.get(f"/panel/lata/{rok.pk}/").content.decode()
 
 

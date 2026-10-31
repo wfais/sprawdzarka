@@ -1,0 +1,97 @@
+{% extends "kurs/panel/baza.html" %}
+{% block tytul %}Oceny{% endblock %}
+{% block tresc %}
+<div class="naglowek"><div><h1>Oceny</h1>
+  <p class="podtytul">Ocena automatyczna (testy i modele) oddanych prac, Twoja decyzja i wysyłka ocen studentom.
+    Niżej kalibracja: reguły, które modele dostają przy kolejnych ocenach.</p></div></div>
+
+<section class="karta przewijanie">
+  <h2>Zestawy w grupach</h2>
+  {% if przydzialy %}
+  <table class="tabela tabela-oceny">
+    <tr><th>Zestaw</th><th>Przedmiot i grupa</th><th>Stan</th><th>Termin ostateczny</th><th class="liczba">Oddane</th>
+      <th>Ocena automatyczna</th><th class="liczba" title="Prace z oddanym kodem i otwartym pull requestem: czekają na Twoją decyzję i wysyłkę">Do decyzji</th>
+      <th class="liczba">Wysłane</th><th></th></tr>
+    {% for p in przydzialy %}
+    <tr>
+      <td><a href="{% url 'panel:przydzial' p.pk %}"><strong>{{ p.zestaw.nazwa }}</strong></a>{% if p.zestaw.kolokwium %}<div><span class="znacznik fiolet">kolokwium</span></div>{% endif %}</td>
+      <td>{{ p.zestaw.kurs.nazwa }}<div class="male drugie">{{ p.grupa.nazwa }} · {{ p.zestaw.kurs.rok.nazwa }}</div></td>
+      <td>{% include "kurs/panel/_stan_zestawu.html" %}</td>
+      <td class="nowrap male">{{ p.termin_twardy|date:"d.m.Y H:i" }}</td>
+      <td class="liczba">{{ p.lacznie }}</td>
+      <td class="male"><span class="meta" style="margin:0">
+        <span>gotowe <b>{{ p.automatyczne.gotowe }}</b></span>
+        {% if p.automatyczne.w_toku %}<span>w toku <b>{{ p.automatyczne.w_toku }}</b></span>{% endif %}
+        {% if p.automatyczne.bledy %}<span class="blad-tekst" style="font-family:inherit">błędy <b>{{ p.automatyczne.bledy }}</b></span>{% endif %}</span></td>
+      <td class="liczba"><a href="{% url 'panel:przydzial' p.pk %}?stan=do_oceny">{{ p.do_oceny }}</a></td>
+      <td class="liczba">{{ p.wyslane }}</td>
+      <td>{% if p.do_oceny %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}"
+          data-potwierdz="Ocenić automatycznie oddane prace bez aktualnej oceny ({{ p.zestaw.nazwa }}, {{ p.grupa.nazwa }})?">{% csrf_token %}
+          <input type="hidden" name="nastepny" value="oceny">
+          <button class="maly" type="submit" data-czekaj="Dodaję do kolejki">Oceń automatycznie</button></form>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="drugie male" style="margin-top:10px">Ocena automatyczna obejmuje prace z oddanym kodem i otwartym pull requestem.
+    Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo liczba „Do decyzji”).
+    Tu są przedmioty widoczne na pulpicie.</p>
+  {% else %}
+  <p class="puste">Nikt jeszcze nie oddał prac w przedmiotach widocznych na pulpicie.</p>
+  {% endif %}
+</section>
+
+<h2 id="kalibracja" style="margin-top:28px">Kalibracja oceniania</h2>
+<div class="naglowek">
+  <p class="podtytul" style="margin:0">Reguły (precedensy) to Twoje rozstrzygnięcia: każdy model dostaje je przy kolejnych ocenach.
+    Statystyki porównują oceny modeli z Twoimi ostatecznymi decyzjami.</p>
+  <form method="get" action="{% url 'panel:oceny' %}#kalibracja" class="przyciski"><select name="zestaw" onchange="this.form.submit()">
+    <option value="">wszystkie zestawy</option>
+    {% for z in zestawy %}<option value="{{ z.pk }}" {% if wybrany and wybrany.pk == z.pk %}selected{% endif %}>{{ z.nazwa }}</option>{% endfor %}
+  </select></form>
+</div>
+
+<div class="metryki">
+  <div class="metryka"><div class="etykieta">Zatwierdzone zadania</div><div class="wartosc">{{ statystyki.zadan }}</div></div>
+  <div class="metryka"><div class="etykieta">Konsensus bez zmian</div><div class="wartosc">{% if statystyki.procent_konsensus is not None %}{{ statystyki.procent_konsensus }}%{% else %}-{% endif %}</div></div>
+  <div class="metryka"><div class="etykieta">Poprawione przez Ciebie</div><div class="wartosc">{{ statystyki.zmienione }}</div></div>
+</div>
+
+{% if statystyki.modele %}
+<div class="karta">
+  <h2>Zgodność modeli z Twoimi ocenami</h2>
+  <table class="tabela">
+    <tr><th>Model</th><th class="liczba">Ocenionych zadań</th><th class="liczba">Średnia różnica (pkt)</th><th class="liczba">W granicach tolerancji</th></tr>
+    {% for nazwa, st in statystyki.modele.items %}
+    <tr><td class="mono">{{ nazwa }}</td><td class="liczba">{{ st.n }}</td><td class="liczba">{{ st.sredni_blad|floatformat:"-2" }}</td><td class="liczba">{{ st.procent_zgodnych }}%</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="siatka-2">
+  <div class="karta">
+    <h2>Reguły</h2>
+    {% for p in precedensy %}
+    <form method="post" action="{% url 'panel:precedens_zmien' p.pk %}" style="padding:10px 0;border-top:1px solid var(--linia)">{% csrf_token %}
+      <div class="male drugie" style="margin-bottom:4px">{{ p.zestaw|default:"wszystkie zestawy" }}{% if p.kod_zadania %} · {{ p.kod_zadania }}{% endif %} · {{ p.utworzono|date:"d.m.Y" }}
+        {% if not p.aktywny %}<span class="znacznik szary">wyłączona</span>{% endif %}</div>
+      <textarea name="tresc" rows="2">{{ p.tresc }}</textarea>
+      <div class="przyciski" style="margin-top:6px">
+        <button class="maly" name="akcja" value="zapisz">Zapisz</button>
+        <button class="maly" name="akcja" value="przelacz">{% if p.aktywny %}Wyłącz{% else %}Włącz{% endif %}</button>
+        <button class="maly niebezpieczny" name="akcja" value="usun">Usuń</button>
+      </div>
+    </form>
+    {% empty %}
+    <p class="slabe">Brak reguł. Dodajesz je tutaj albo przy zatwierdzaniu oceny spornej pracy.</p>
+    {% endfor %}
+  </div>
+  <details class="karta rozwijana"{% if formularz.errors %} open{% endif %}>
+    <summary><h2>Nowa reguła</h2></summary>
+    <form method="post" class="formularz">{% csrf_token %}
+      {{ formularz.as_div }}
+      <button class="glowny" type="submit">Dodaj</button>
+    </form>
+  </details>
+</div>
+{% endblock %}

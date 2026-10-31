@@ -125,5 +125,5 @@ def test_logowanie_panelu_django_przez_panel(client):
 
 @pytest.mark.django_db
 def test_administracja_pokazuje_dostep(client, konta, prowadzacy):
-    strona = client.get("/panel/administracja/").content.decode()
+    strona = client.get("/panel/ustawienia/").content.decode()
     assert "Dostęp do panelu" in strona and "@witek" in strona and "jeszcze się nie logowało" in strona
