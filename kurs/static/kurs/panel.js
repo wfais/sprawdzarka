@@ -195,3 +195,12 @@ function terminyNaDzisiaj(formularz) {
   document.addEventListener("toggle", odswiez, true);
   odswiez();
 })();
+
+// Edycja na miejscu: Anuluj zamyka formularz i przywraca wartosci sprzed edycji
+document.addEventListener("click", function (zdarzenie) {
+  var przycisk = zdarzenie.target.closest("[data-anuluj-edycje]");
+  if (!przycisk) return;
+  var edycja = przycisk.closest("details.edycja");
+  if (przycisk.form) przycisk.form.reset();
+  if (edycja) edycja.open = false;
+});

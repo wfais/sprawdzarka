@@ -515,3 +515,35 @@ def test_tryb_serwisowy(client, github, prowadzacy, przydzial):
     client.post("/panel/ustawienia/tryb-serwisowy/", {"wlacz": "0"})
     odp = client.get(f"/z/{przydzial.token}/")
     assert odp.status_code == 200 and "trwają prace serwisowe" not in odp.content.decode()
+
+
+@pytest.mark.django_db
+def test_karta_studenta_informacja_i_edycja_na_miejscu(client, github, prowadzacy, przydzial):
+    from django.utils import timezone
+    from kurs import uslugi
+    z = uslugi.akceptuj(przydzial, 99, "ewa", "Ewa Lis")
+    adres = f"/panel/zgloszenia/{z.pk}/"
+    strona = client.get(adres).content.decode()
+    # Najpierw informacja i przycisk Edytuj, terminy grupy oznaczone jako oryginalne
+    assert "<dd>Ewa Lis</dd>" in strona and strona.count('class="przycisk maly edytuj">Edytuj</summary>') == 2
+    assert strona.count(">oryginalny<") == 2 and ">zmieniony<" not in strona
+    # Pola formularza wypelnione terminami obowiazujacymi; zapis bez zmian nie tworzy wyjatku
+    miejscowy = timezone.localtime
+    pola = {"wyjatek_termin_miekki": miejscowy(przydzial.termin_miekki).strftime("%Y-%m-%dT%H:%M"),
+            "wyjatek_termin_twardy": miejscowy(przydzial.termin_twardy).strftime("%Y-%m-%dT%H:%M")}
+    assert f'value="{pola["wyjatek_termin_miekki"]}"' in strona
+    client.post(f"/panel/zgloszenia/{z.pk}/termin/", pola)
+    z.refresh_from_db()
+    assert not z.ma_wyjatek
+    # Zmieniony termin ostateczny: etykieta i termin oryginalny obok
+    pola["wyjatek_termin_twardy"] = miejscowy(przydzial.termin_twardy + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
+    client.post(f"/panel/zgloszenia/{z.pk}/termin/", pola)
+    z.refresh_from_db()
+    assert z.wyjatek_termin_miekki is None and z.wyjatek_termin_twardy is not None
+    strona = client.get(adres).content.decode()
+    assert strona.count(">zmieniony<") == 1 and strona.count(">oryginalny<") == 1 and "oryginalnie " in strona
+    assert "Przywróć terminy grupy" in strona
+    # Przywrocenie terminow grupy
+    client.post(f"/panel/zgloszenia/{z.pk}/termin/", {"akcja": "przywroc"})
+    z.refresh_from_db()
+    assert not z.ma_wyjatek

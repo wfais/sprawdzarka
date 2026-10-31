@@ -358,13 +358,32 @@ class FormularzWyjatku(forms.ModelForm):
         model = Zgloszenie
         fields = ["wyjatek_termin_miekki", "wyjatek_termin_twardy"]
         widgets = {"wyjatek_termin_miekki": PoleDatyICzasu(), "wyjatek_termin_twardy": PoleDatyICzasu()}
-        help_texts = {"wyjatek_termin_miekki": "Puste: termin grupy.", "wyjatek_termin_twardy": "Puste: termin grupy."}
+        labels = {"wyjatek_termin_miekki": "Termin", "wyjatek_termin_twardy": "Termin ostateczny"}
+        help_texts = {"wyjatek_termin_miekki": "Puste albo taki jak grupy: termin oryginalny.",
+                      "wyjatek_termin_twardy": "Puste albo taki jak grupy: termin oryginalny."}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pola pokazuja terminy obowiazujace studenta (indywidualne albo grupy), do poprawienia na miejscu
+        if not self.is_bound and self.instance.pk:
+            self.initial["wyjatek_termin_miekki"] = self.instance.termin_miekki
+            self.initial["wyjatek_termin_twardy"] = self.instance.termin_twardy
 
     def clean(self):
         dane = super().clean()
         miekki, twardy = dane.get("wyjatek_termin_miekki"), dane.get("wyjatek_termin_twardy")
         if miekki and twardy and twardy < miekki:
             raise forms.ValidationError("Termin ostateczny nie może być wcześniejszy niż termin.")
+        # Termin taki sam jak grupy to brak wyjatku: zmiana terminu grupy obejmie tez tego studenta
+        przydzial = self.instance.przydzial
+
+        def ta_sama_minuta(a, b):
+            return a.replace(second=0, microsecond=0) == b.replace(second=0, microsecond=0)
+
+        if miekki and ta_sama_minuta(miekki, przydzial.termin_miekki):
+            dane["wyjatek_termin_miekki"] = None
+        if twardy and ta_sama_minuta(twardy, przydzial.termin_twardy):
+            dane["wyjatek_termin_twardy"] = None
         return dane
 
 

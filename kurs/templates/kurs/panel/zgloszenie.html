@@ -79,11 +79,20 @@
   <div>
     <div class="karta">
       <h2>Student</h2>
-      <form method="post" action="{% url 'panel:student_nazwisko' z.student.pk %}" class="formularz">{% csrf_token %}
-        {{ formularz_nazwiska.as_div }}
-        <input type="hidden" name="nastepny" value="{{ request.path }}">
-        <button class="maly" type="submit">Zapisz</button>
-      </form>
+      <div class="edycja-w-miejscu">
+        <dl class="opis-pola podglad-edycji">
+          <dt>Imię i nazwisko</dt><dd>{% if z.student.imie_nazwisko %}{{ z.student.imie_nazwisko }}{% else %}<span class="slabe">brak</span>{% endif %}</dd>
+        </dl>
+        <details class="edycja">
+          <summary class="przycisk maly edytuj">Edytuj</summary>
+          <form method="post" action="{% url 'panel:student_nazwisko' z.student.pk %}" class="formularz">{% csrf_token %}
+            {{ formularz_nazwiska.as_div }}
+            <input type="hidden" name="nastepny" value="{{ request.path }}">
+            <div class="przyciski"><button class="maly glowny" type="submit">Zapisz</button>
+              <button class="maly" type="button" data-anuluj-edycje>Anuluj</button></div>
+          </form>
+        </details>
+      </div>
       {% if z.student.kandydat_readme and not z.student.imie_nazwisko %}
       <form method="post" action="{% url 'panel:student_nazwisko' z.student.pk %}">{% csrf_token %}
         <input type="hidden" name="nastepny" value="{{ request.path }}">
@@ -99,10 +108,25 @@
 
     <div class="karta">
       <h2>Indywidualny termin</h2>
-      <form method="post" action="{% url 'panel:zgloszenie_termin' z.pk %}" class="formularz">{% csrf_token %}
-        {{ formularz_wyjatku.as_div }}
-        <button class="maly" type="submit">Zapisz terminy</button>
-      </form>
+      <div class="edycja-w-miejscu">
+        <dl class="opis-pola podglad-edycji">
+          <dt>Termin</dt><dd>{{ z.termin_miekki|date:"d.m.Y H:i" }}
+            {% if termin_miekki_zmieniony %}<span class="znacznik fiolet">zmieniony</span><div class="male slabe">oryginalnie {{ z.przydzial.termin_miekki|date:"d.m.Y H:i" }}</div>
+            {% else %}<span class="male slabe">oryginalny</span>{% endif %}</dd>
+          <dt>Termin ostateczny</dt><dd>{{ z.termin_twardy|date:"d.m.Y H:i" }}
+            {% if termin_twardy_zmieniony %}<span class="znacznik fiolet">zmieniony</span><div class="male slabe">oryginalnie {{ z.przydzial.termin_twardy|date:"d.m.Y H:i" }}</div>
+            {% else %}<span class="male slabe">oryginalny</span>{% endif %}</dd>
+        </dl>
+        <details class="edycja">
+          <summary class="przycisk maly edytuj">Edytuj</summary>
+          <form method="post" action="{% url 'panel:zgloszenie_termin' z.pk %}" class="formularz">{% csrf_token %}
+            {{ formularz_wyjatku.as_div }}
+            <div class="przyciski"><button class="maly glowny" type="submit">Zapisz</button>
+              <button class="maly" type="button" data-anuluj-edycje>Anuluj</button>
+              {% if z.ma_wyjatek %}<button class="maly" type="submit" name="akcja" value="przywroc" formnovalidate>Przywróć terminy grupy</button>{% endif %}</div>
+          </form>
+        </details>
+      </div>
     </div>
 
     <div class="karta">

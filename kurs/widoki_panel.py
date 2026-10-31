@@ -1104,6 +1104,8 @@ def zgloszenie(request, pk):
         "z": zgl,
         "formularz_oceny": formularz_oceny,
         "formularz_wyjatku": FormularzWyjatku(instance=zgl),
+        "termin_miekki_zmieniony": zgl.termin_miekki != zgl.przydzial.termin_miekki,
+        "termin_twardy_zmieniony": zgl.termin_twardy != zgl.przydzial.termin_twardy,
         "formularz_nazwiska": FormularzNazwiska(instance=zgl.student),
         "wypchniecia": wypchniecia,
         "inne": zgl.student.zgloszenia.exclude(pk=zgl.pk).select_related("przydzial__zestaw", "przydzial__grupa"),
@@ -1116,7 +1118,10 @@ def zgloszenie(request, pk):
 @require_POST
 def zgloszenie_termin(request, pk):
     zgl = _zgloszenie(pk)
-    formularz = FormularzWyjatku(request.POST, instance=zgl)
+    dane = request.POST
+    if request.POST.get("akcja") == "przywroc":
+        dane = {"wyjatek_termin_miekki": "", "wyjatek_termin_twardy": ""}
+    formularz = FormularzWyjatku(dane, instance=zgl)
     if formularz.is_valid():
         formularz.save()
         zgl.do_przeliczenia = True
@@ -1125,7 +1130,7 @@ def zgloszenie_termin(request, pk):
             uslugi.przelicz(zgl)
         except uslugi.BLEDY as blad:
             messages.warning(request, f"Zapisano, ale przeliczenie się nie powiodło: {blad}")
-        messages.success(request, "Zapisano indywidualne terminy.")
+        messages.success(request, "Zapisano terminy studenta." if zgl.ma_wyjatek else "Student ma terminy grupy.")
     else:
         messages.error(request, "Niepoprawne terminy.")
     return redirect("panel:zgloszenie", pk=pk)
