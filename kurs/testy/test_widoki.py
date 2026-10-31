@@ -5,7 +5,7 @@ import pytest
 import responses
 from django.utils import timezone
 
-from kurs.models import Grupa, Przydzial, Student, Zestaw, Zgloszenie
+from kurs.models import Ewaluacja, Grupa, Przydzial, Student, Zestaw, Zgloszenie
 
 
 def zaloguj_studenta(client, gh_id=77, login="jank", nazwa="Jan Kowalski"):
@@ -399,12 +399,24 @@ def test_oceny_pokazuja_prace_do_decyzji(client, github, prowadzacy, przydzial):
     from kurs import uslugi
     # Zestaw wydany grupie widac od razu, takze zanim ktos zaakceptuje zaproszenie
     strona = client.get("/panel/oceny/").content.decode()
-    assert f"/panel/przydzialy/{przydzial.pk}/" in strona and "nikt jeszcze nie zaakceptował" in strona
-    assert ">Oceń</button>" not in strona
+    assert f"/panel/przydzialy/{przydzial.pk}/" in strona and strona.count(">0/0<") == 2
+    assert ">Oceń</button>" not in strona and "nikt jeszcze" not in strona
     z = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
     Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="c" * 40)
     strona = client.get("/panel/oceny/").content.decode()
-    assert f"/panel/przydzialy/{przydzial.pk}/ocen/" in strona and ">Oceń</button>" in strona
+    assert f"/panel/przydzialy/{przydzial.pk}/ocen/" in strona and ">Oceń</button>" in strona and ">0/1<" in strona
+    assert "> oceniono<" not in strona
+    # W toku: bez przycisku; po ocenie aktualnej dla tych ustawien: 1/1
+    from kurs import ocena
+    e = Ewaluacja.objects.create(zgloszenie=z, sha="c" * 40, konfiguracja=ocena.odcisk_konfiguracji(przydzial.zestaw))
+    strona = client.get("/panel/oceny/").content.decode()
+    assert "w toku 1" in strona and ">Oceń</button>" not in strona
+    Ewaluacja.objects.filter(pk=e.pk).update(status=Ewaluacja.Status.GOTOWA)
+    strona = client.get("/panel/oceny/").content.decode()
+    assert ">1/1<" in strona and ">Oceń</button>" not in strona
+    # Nowy kod studenta: ocena nieaktualna, przycisk wraca
+    Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="d" * 40)
+    assert ">Oceń</button>" in client.get("/panel/oceny/").content.decode()
     # Bez nowych prac do oceny przycisk wraca na liste Oceny
     Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="")
     odp = client.post(f"/panel/przydzialy/{przydzial.pk}/ocen/", {"nastepny": "oceny"})

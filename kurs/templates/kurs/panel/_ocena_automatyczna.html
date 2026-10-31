@@ -4,7 +4,7 @@
     {% if z.status == Status.GOTOWE and z.sha_oceniany %}
     <form method="post" action="{% url 'panel:zgloszenie_ocen' z.pk %}" class="w-linii">{% csrf_token %}
       {% if ewaluacja %}<input type="hidden" name="wymus" value="1">{% endif %}
-      <button type="submit" class="maly" data-czekaj="Uruchamiam">{% if ewaluacja %}Oceń ponownie{% else %}Oceń{% endif %}</button>
+      <button type="submit" class="maly glowny" data-czekaj="Uruchamiam">{% if ewaluacja %}Oceń ponownie{% else %}Oceń{% endif %}</button>
     </form>
     {% endif %}
   </div>

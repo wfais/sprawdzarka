@@ -1426,7 +1426,7 @@ def przydzial_ocen(request, pk):
             licznik += 1
     if licznik:
         _uruchom_w_tle()
-        messages.success(request, f"Dodano do kolejki oceny: {licznik}. Wyniki pojawią się w kolumnie „Ocena automatyczna”.")
+        messages.success(request, f"Dodano do kolejki oceny: {licznik}. Wyniki pojawią się w kolumnie „Ocena”.")
     else:
         messages.info(request, "Nie ma nowych prac do oceny (oceniane są prace z oddanym kodem i otwartym pull requestem).")
     if request.POST.get("nastepny") == "oceny":
@@ -1516,11 +1516,34 @@ def modele_sprawdz(request):
 
 def _przydzialy_do_oceny():
     """Wszystkie zestawy wydane grupom (z lat i przedmiotow widocznych na pulpicie), takze bez
-    zaakceptowanych prac, z licznikiem wystawionych ocen."""
+    zaakceptowanych prac. Dla kazdego: ocena automatyczna (ocenione / z oddanym kodem, w toku,
+    do oceny) i wystawione oceny ostateczne."""
     przydzialy = list(_dolacz_liczniki(
         Przydzial.objects.filter(zestaw__kurs__ukryty=False, zestaw__kurs__rok__ukryty=False,
                                  zestaw__kurs__rok__zarchiwizowany=False)
         .select_related("zestaw__kurs__rok__uczelnia", "grupa")))
+    mapa = {p.pk: p for p in przydzialy}
+    odciski = {}
+    for p in przydzialy:
+        p.z_kodem = p.ocenione_automatycznie = p.w_toku = p.do_oceny_automatycznie = 0
+        if p.zestaw_id not in odciski:
+            odciski[p.zestaw_id] = ocena.odcisk_konfiguracji(p.zestaw)
+    ewaluacje = Ewaluacja.objects.only("zgloszenie_id", "sha", "konfiguracja", "status", "zatwierdzona", "utworzono")
+    for z in (Zgloszenie.objects.filter(przydzial_id__in=mapa, status=Zgloszenie.Status.GOTOWE).exclude(sha_oceniany="")
+              .only("przydzial_id", "sha_oceniany", "pr_zamkniety").prefetch_related(Prefetch("ewaluacje", queryset=ewaluacje))):
+        p = mapa[z.przydzial_id]
+        odcisk = odciski[p.zestaw_id]
+        biezace = [e for e in z.ewaluacje.all() if e.sha == z.sha_oceniany]
+        p.z_kodem += 1
+        # Ocena aktualna: gotowa dla tego stanu kodu i tych ustawien (zatwierdzona zostaje aktualna);
+        # praca z wyslana ocena nie wymaga juz oceny automatycznej
+        if z.pr_zamkniety or any(e.status == Ewaluacja.Status.GOTOWA and (e.konfiguracja == odcisk or e.zatwierdzona)
+                                 for e in biezace):
+            p.ocenione_automatycznie += 1
+        elif any(e.w_toku and e.konfiguracja == odcisk for e in biezace):
+            p.w_toku += 1
+        else:
+            p.do_oceny_automatycznie += 1
     przydzialy.sort(key=lambda p: (p.dioda_ocen != "czerwony" and p.dioda_ocen != "fiolet", p.zestaw.kurs.rok.poligon,
                                    p.termin_twardy))
     return przydzialy

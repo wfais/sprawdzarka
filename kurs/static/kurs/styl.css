@@ -179,6 +179,12 @@ details.rozwijana[open] > summary { margin-bottom: 14px; }
 .separator-licznikow { width: 1px; align-self: stretch; background: var(--linia-mocna); margin: 2px 6px; }
 .kolumna-oceny { width: 1%; white-space: nowrap; }
 .tabela-oceny .stan-zestawu { margin-top: 1px; }
+/* Oceny: kolumny wyroznione delikatnym tlem (pionowe pasy) */
+.tabela-oceny .kolumna-ocena { background: color-mix(in srgb, var(--niebieski-tlo) 55%, transparent); }
+.tabela-oceny .kolumna-zakonczone { background: color-mix(in srgb, var(--zielony-tlo) 55%, transparent); }
+.tabela-oceny th.kolumna-ocena, .tabela-oceny th.kolumna-zakonczone { color: var(--tekst); }
+.ocena-w-kolumnie { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.ocena-w-kolumnie .ulamek { font-variant-numeric: tabular-nums; min-width: 42px; }
 
 /* Sekcje roku na pulpicie */
 .sekcja-roku { margin-top: 30px; }

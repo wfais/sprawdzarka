@@ -10,7 +10,8 @@
   {% if przydzialy %}
   <table class="tabela tabela-oceny">
     <tr><th>Zestaw</th><th>Przedmiot i grupa</th><th>Stan</th><th>Termin ostateczny</th><th class="liczba" title="Przyjęte zaproszenia (założone repozytoria)">Przyjęte</th>
-      <th>Oceniono</th><th></th></tr>
+      <th class="kolumna-ocena" title="Prace ocenione automatycznie (testy i modele) / prace z oddanym kodem">Ocena</th>
+      <th class="kolumna-zakonczone" title="Prace z wystawioną oceną ostateczną / wszystkie przyjęte">Zakończone</th></tr>
     {% for p in przydzialy %}
     <tr>
       <td><a href="{% url 'panel:przydzial' p.pk %}"><strong>{{ p.zestaw.nazwa }}</strong></a>{% if p.zestaw.kolokwium %}<div><span class="znacznik fiolet">kolokwium</span></div>{% endif %}</td>
@@ -18,16 +19,19 @@
       <td>{% include "kurs/panel/_stan_zestawu.html" %}</td>
       <td class="nowrap male">{{ p.termin_twardy|date:"d.m.Y H:i" }}</td>
       <td class="liczba">{{ p.lacznie }}</td>
-      <td>{% if p.lacznie %}{% include "kurs/panel/_licznik_ocen.html" with p=p only %}{% else %}<span class="male drugie">nikt jeszcze nie zaakceptował</span>{% endif %}</td>
-      <td>{% if p.do_oceny_automatycznej %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}"
-          data-potwierdz="Ocenić automatycznie oddane prace bez aktualnej oceny ({{ p.zestaw.nazwa }}, {{ p.grupa.nazwa }})?">{% csrf_token %}
+      <td class="kolumna-ocena"><div class="ocena-w-kolumnie"><b class="ulamek">{{ p.ocenione_automatycznie }}/{{ p.z_kodem }}</b>
+        {% if p.w_toku %}<span class="male drugie">w toku {{ p.w_toku }}</span>{% endif %}
+        {% if p.do_oceny_automatycznie %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}" class="w-linii"
+          data-potwierdz="Ocenić automatycznie prace z oddanym kodem, które nie mają aktualnej oceny ({{ p.zestaw.nazwa }}, {{ p.grupa.nazwa }})?">{% csrf_token %}
           <input type="hidden" name="nastepny" value="oceny">
-          <button class="maly" type="submit" data-czekaj="Dodaję do kolejki">Oceń</button></form>{% endif %}</td>
+          <button class="maly glowny" type="submit" data-czekaj="Dodaję do kolejki">Oceń</button></form>{% endif %}</div></td>
+      <td class="kolumna-zakonczone">{% include "kurs/panel/_licznik_ocen.html" with p=p bez_napisu=True only %}</td>
     </tr>
     {% endfor %}
   </table>
-  <p class="drugie male" style="margin-top:10px">„Oceń” uruchamia ocenę automatyczną (testy i modele) prac z oddanym kodem i otwartym pull requestem.
-    Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo licznik „oceniono”).
+  <p class="drugie male" style="margin-top:10px">Ocena: prace ocenione automatycznie (testy i modele) z wszystkich z oddanym kodem;
+    „Oceń” ocenia pozostałe. Zakończone: prace z Twoją oceną ostateczną z wszystkich przyjętych (bez kodu: 0 pkt).
+    Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo licznik w kolumnie „Zakończone”).
     Tu są przedmioty widoczne na pulpicie.</p>
   {% else %}
   <p class="puste">Brak zestawów wydanych grupom w przedmiotach widocznych na pulpicie.</p>
