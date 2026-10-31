@@ -60,7 +60,7 @@
 
     <div class="karta">
       {% if ewaluacja and ewaluacja.status == "gotowa" %}<details><summary><strong>Ocena ręczna</strong> (bez rozbicia na zadania)</summary><div style="margin-top:10px">{% else %}
-      <h2>Ocena i zamknięcie pull requestu</h2>{% endif %}
+      <h2>Punktacja i zamknięcie pull requestu</h2>{% endif %}
       {% if z.pr_zamkniety %}
         <div class="uwaga">Pull request zamknięty {{ z.oceniono|date:"d.m.Y H:i" }}. Wynik: <strong>{{ z.wynik|floatformat:"-2" }} / {{ z.przydzial.zestaw.punkty_max|floatformat:"-2" }}</strong>. Ponowne wysłanie doda nowy komentarz.</div>
       {% endif %}
