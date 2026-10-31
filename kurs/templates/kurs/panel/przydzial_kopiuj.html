@@ -15,14 +15,15 @@
     {% if zestaw_formularzy.non_form_errors %}<div class="blad-tekst">{{ zestaw_formularzy.non_form_errors }}</div>{% endif %}
     <table class="tabela">
       <tr><th><input type="checkbox" data-zaznacz-wszystkie=".wybor-grupy" title="zaznacz wszystkie"></th>
-        <th>Grupa</th><th title="puste: od razu">Publikacja</th><th>Termin</th><th>Termin ostateczny</th><th>Przedrostek repozytoriów i źródło</th></tr>
+        <th>Grupa</th><th>Termin</th><th>Termin ostateczny</th><th title="puste: od razu">Publikacja</th><th>Przedrostek repozytoriów i źródło</th></tr>
       {% for grupa, f in wiersze %}
       <tr>
         <td>{{ f.grupa }}{{ f.wybrana }}</td>
         <td><label class="nowrap" for="{{ f.wybrana.id_for_label }}">{{ grupa.nazwa }}</label>{% if grupa.opis %}<div class="male drugie">{{ grupa.opis }}</div>{% endif %}</td>
-        <td>{{ f.publikacja }}{{ f.publikacja.errors }}</td>
         <td>{{ f.termin_miekki }}{{ f.termin_miekki.errors }}</td>
         <td>{{ f.termin_twardy }}{{ f.termin_twardy.errors }}</td>
+        <td><details class="pozniejsza-publikacja"{% if f.publikacja.value or f.publikacja.errors %} open{% endif %}>
+          <summary class="nowrap">od razu, zmień</summary>{{ f.publikacja }}{{ f.publikacja.errors }}</details></td>
         <td class="pola-repo">{{ f.przedrostek_repo }}{{ f.przedrostek_repo.errors }}{{ f.repo_zrodlowe }}{{ f.repo_zrodlowe.errors }}</td>
       </tr>
       {% endfor %}

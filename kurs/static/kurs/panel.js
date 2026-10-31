@@ -26,6 +26,11 @@ document.addEventListener("submit", function (zdarzenie) {
     zdarzenie.preventDefault();
     return;
   }
+  var dzisiejsze = terminyNaDzisiaj(formularz);
+  if (dzisiejsze && !window.confirm(dzisiejsze)) {
+    zdarzenie.preventDefault();
+    return;
+  }
   var przycisk = formularz.querySelector("[data-czekaj]");
   if (przycisk) {
     setTimeout(function () {
@@ -50,6 +55,26 @@ document.addEventListener("click", function (zdarzenie) {
   if (!wiersz || zdarzenie.target.closest("a, button, form, input")) return;
   window.location = wiersz.getAttribute("data-href");
 });
+
+// Termin oddania ustawiony wlasnie na dzisiaj: pytanie przed zapisem (pole zmienione i data dzisiejsza)
+function terminyNaDzisiaj(formularz) {
+  var d = new Date();
+  var dwa = function (n) { return (n < 10 ? "0" : "") + n; };
+  var dzis = d.getFullYear() + "-" + dwa(d.getMonth() + 1) + "-" + dwa(d.getDate());
+  var opisy = [];
+  formularz.querySelectorAll('input[name$="termin_miekki"], input[name$="termin_twardy"]').forEach(function (pole) {
+    if (pole.disabled || !pole.value || pole.value === pole.defaultValue || pole.value.slice(0, 10) !== dzis) return;
+    var wiersz = pole.closest("tr");
+    var wybor = wiersz && wiersz.querySelector('input[type=checkbox][name$="wybrana"]');
+    if (wybor && !wybor.checked) return;  // grupa niezaznaczona przy kopiowaniu
+    var grupa = wiersz && wiersz.querySelector("label");
+    var rodzaj = /termin_twardy$/.test(pole.name) ? "termin ostateczny" : "termin";
+    opisy.push("- " + (grupa ? grupa.textContent.trim() + ", " : "") + rodzaj + ", godz. " + pole.value.slice(11, 16));
+  });
+  if (!opisy.length) return "";
+  return "Termin oddania przypada na dzisiaj (" + dwa(d.getDate()) + "." + dwa(d.getMonth() + 1) + "):\n"
+    + opisy.join("\n") + "\n\nCzy na pewno?";
+}
 
 // Terminy: "godzina 23:59" przy terminie i "tydzien pozniej" przy terminie ostatecznym
 (function () {

@@ -1,7 +1,9 @@
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 import responses
+from django.utils import timezone
 
 from kurs.models import Grupa, Przydzial, Student, Zestaw, Zgloszenie
 
@@ -337,3 +339,29 @@ def test_strona_studenta_bez_readme_i_z_jednym_terminem(client, github, przydzia
     Przydzial.objects.filter(pk=przydzial.pk).update(termin_twardy=przydzial.termin_miekki)
     strona = client.get(f"/z/{przydzial.token}/").content.decode()
     assert "Z karą do" not in strona and "Termin" in strona
+
+
+@pytest.mark.django_db
+def test_publikacja_pod_terminami_i_zwinieta(client, github, prowadzacy, zestaw, grupa):
+    """Pole publikacji stoi po terminach i jest schowane pod odnosnikiem (zwykle zostaje puste)."""
+    tresc = client.get(f"/panel/zestawy/{zestaw.pk}/").content.decode()
+    assert tresc.index('name="termin_twardy"') < tresc.index('name="publikacja"')
+    assert '<details class="pozniejsza-publikacja">' in tresc
+
+
+@pytest.mark.django_db
+def test_edycja_opublikowanego_zostawia_date_publikacji(client, github, prowadzacy, przydzial):
+    dawniej = timezone.now() - timedelta(days=3)
+    Przydzial.objects.filter(pk=przydzial.pk).update(publikacja=dawniej)
+    adres = f"/panel/przydzialy/{przydzial.pk}/edycja/"
+    assert '<details class="pozniejsza-publikacja">' in client.get(adres).content.decode()
+    client.post(adres, {
+        "termin_miekki": timezone.localtime(przydzial.termin_miekki).strftime("%Y-%m-%dT%H:%M"),
+        "termin_twardy": timezone.localtime(przydzial.termin_twardy).strftime("%Y-%m-%dT%H:%M"),
+        "publikacja": "", "otwarty": "on",
+    })
+    przydzial.refresh_from_db()
+    assert przydzial.publikacja == dawniej
+    # Zaplanowana publikacja: pole od razu widoczne
+    Przydzial.objects.filter(pk=przydzial.pk).update(publikacja=timezone.now() + timedelta(days=2))
+    assert '<details class="pozniejsza-publikacja" open>' in client.get(adres).content.decode()

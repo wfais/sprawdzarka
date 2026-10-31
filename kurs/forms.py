@@ -25,6 +25,10 @@ def oczysc_repo(wartosc: str) -> str:
     return wartosc
 
 
+# Pole publikacji zwiniete pod odnosnikiem: zwykle puste (link dziala od razu), latwo je pomylic z terminem
+SZABLON_POLA_PUBLIKACJI = "kurs/panel/_pole_publikacji.html"
+
+
 def publikacja_od(wartosc, poprzednia=None):
     """Data publikacji: pusta albo z przeszlosci oznacza od razu (zostaje wczesniejsza publikacja, jesli byla)."""
     teraz = timezone.now()
@@ -196,13 +200,14 @@ class FormularzPrzydzialu(forms.ModelForm):
 
     class Meta:
         model = Przydzial
-        fields = ["zestaw", "grupa", "publikacja", "termin_miekki", "termin_twardy", "przedrostek_repo",
+        fields = ["zestaw", "grupa", "termin_miekki", "termin_twardy", "publikacja", "przedrostek_repo",
                   "repo_zrodlowe", "otwarty", "auto_ocena"]
         widgets = {"publikacja": PoleDatyICzasu(), "termin_miekki": PoleDatyICzasu(), "termin_twardy": PoleDatyICzasu()}
 
     def __init__(self, *args, zestaw=None, grupa=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.zestaw, self.grupa = zestaw, grupa
+        self.fields["publikacja"].template_name = SZABLON_POLA_PUBLIKACJI
         if zestaw is not None:
             del self.fields["zestaw"]
             self.fields["grupa"].queryset = Grupa.objects.filter(aktywna=True, kurs=zestaw.kurs_id).exclude(
@@ -253,11 +258,15 @@ class FormularzPrzydzialu(forms.ModelForm):
 class FormularzEdycjiPrzydzialu(forms.ModelForm):
     class Meta:
         model = Przydzial
-        fields = ["publikacja", "termin_miekki", "termin_twardy", "repo_zrodlowe", "otwarty", "auto_ocena"]
+        fields = ["termin_miekki", "termin_twardy", "publikacja", "repo_zrodlowe", "otwarty", "auto_ocena"]
         widgets = {"publikacja": PoleDatyICzasu(), "termin_miekki": PoleDatyICzasu(), "termin_twardy": PoleDatyICzasu()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["publikacja"].template_name = SZABLON_POLA_PUBLIKACJI
+        if self.instance.publikacja and self.instance.publikacja <= timezone.now():
+            # Juz opublikowany: pole puste i zwiniete; puste przy zapisie zostawia dotychczasowa publikacje
+            self.initial["publikacja"] = None
         if self.instance.repo_startowe:
             # Repozytorium startowe juz powstalo: zrodlo zmienia sie tylko przez nowy zestaw
             del self.fields["repo_zrodlowe"]

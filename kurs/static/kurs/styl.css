@@ -342,6 +342,9 @@ details summary { cursor: pointer; color: var(--drugi); }
 label.pomoc-terminu { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--drugi); font-weight: 400; cursor: pointer; }
 label.pomoc-terminu input { width: auto; margin: 0; }
 td .pomoc-terminu { display: flex; margin-top: 4px; }
+.pozniejsza-publikacja > summary { font-size: 13.5px; width: fit-content; }
+.pozniejsza-publikacja > summary:hover { color: var(--tekst); text-decoration: underline; }
+.pozniejsza-publikacja[open] > summary { margin-bottom: 8px; }
 
 /* --- Studenci wedlug grup --- */
 .filtr-studentow input[type="search"] { width: 240px; }
