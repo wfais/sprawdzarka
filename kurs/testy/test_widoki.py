@@ -397,7 +397,10 @@ def test_nowa_grupa_i_nowy_zestaw_z_list(client, prowadzacy, zestaw, grupa):
 @pytest.mark.django_db
 def test_oceny_pokazuja_prace_do_decyzji(client, github, prowadzacy, przydzial):
     from kurs import uslugi
-    assert "Nikt jeszcze nie oddał prac" in client.get("/panel/oceny/").content.decode()
+    # Zestaw wydany grupie widac od razu, takze zanim ktos zaakceptuje zaproszenie
+    strona = client.get("/panel/oceny/").content.decode()
+    assert f"/panel/przydzialy/{przydzial.pk}/" in strona and "nikt jeszcze nie zaakceptował" in strona
+    assert ">Oceń</button>" not in strona
     z = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
     Zgloszenie.objects.filter(pk=z.pk).update(sha_oceniany="c" * 40)
     strona = client.get("/panel/oceny/").content.decode()

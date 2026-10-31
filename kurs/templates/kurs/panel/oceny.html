@@ -18,11 +18,12 @@
       <td>{% include "kurs/panel/_stan_zestawu.html" %}</td>
       <td class="nowrap male">{{ p.termin_twardy|date:"d.m.Y H:i" }}</td>
       <td class="liczba">{{ p.lacznie }}</td>
-      <td class="male"><span class="meta" style="margin:0">
+      {% if p.lacznie %}<td class="male"><span class="meta" style="margin:0">
         <span>gotowe <b>{{ p.automatyczne.gotowe }}</b></span>
         {% if p.automatyczne.w_toku %}<span>w toku <b>{{ p.automatyczne.w_toku }}</b></span>{% endif %}
         {% if p.automatyczne.bledy %}<span class="blad-tekst" style="font-family:inherit">błędy <b>{{ p.automatyczne.bledy }}</b></span>{% endif %}</span></td>
       <td>{% include "kurs/panel/_licznik_ocen.html" with p=p only %}</td>
+      {% else %}<td colspan="2" class="male drugie">nikt jeszcze nie zaakceptował</td>{% endif %}
       <td>{% if p.do_oceny_automatycznej %}<form method="post" action="{% url 'panel:przydzial_ocen' p.pk %}"
           data-potwierdz="Ocenić automatycznie oddane prace bez aktualnej oceny ({{ p.zestaw.nazwa }}, {{ p.grupa.nazwa }})?">{% csrf_token %}
           <input type="hidden" name="nastepny" value="oceny">
@@ -34,7 +35,7 @@
     Ocenę zatwierdzasz i wysyłasz studentom na stronie zestawu w grupie (nazwa zestawu albo licznik „oceniono”).
     Tu są przedmioty widoczne na pulpicie.</p>
   {% else %}
-  <p class="puste">Nikt jeszcze nie oddał prac w przedmiotach widocznych na pulpicie.</p>
+  <p class="puste">Brak zestawów wydanych grupom w przedmiotach widocznych na pulpicie.</p>
   {% endif %}
 </section>
 

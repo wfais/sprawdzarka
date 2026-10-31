@@ -1520,12 +1520,12 @@ _W_TOKU = {Ewaluacja.Status.OCZEKUJE, Ewaluacja.Status.TESTY, Ewaluacja.Status.M
 
 
 def _przydzialy_do_oceny():
-    """Zestawy w grupach z oddanymi pracami (z lat i przedmiotow widocznych na pulpicie):
-    ocena automatyczna aktualnej wersji kodu i wystawione oceny."""
-    przydzialy = [p for p in _dolacz_liczniki(
+    """Wszystkie zestawy wydane grupom (z lat i przedmiotow widocznych na pulpicie), takze bez
+    zaakceptowanych prac: ocena automatyczna aktualnej wersji kodu i wystawione oceny."""
+    przydzialy = list(_dolacz_liczniki(
         Przydzial.objects.filter(zestaw__kurs__ukryty=False, zestaw__kurs__rok__ukryty=False,
                                  zestaw__kurs__rok__zarchiwizowany=False)
-        .select_related("zestaw__kurs__rok__uczelnia", "grupa")) if p.lacznie]
+        .select_related("zestaw__kurs__rok__uczelnia", "grupa")))
     mapa = {p.pk: p for p in przydzialy}
     for p in przydzialy:
         p.automatyczne = dict.fromkeys(_STAN_OCENY, 0)
