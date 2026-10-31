@@ -527,3 +527,105 @@ def test_przedrostek_uzyty_dokladnie_jak_wpisany(github, przydzial):
     przydzial.przedrostek_repo = "set0_"
     przydzial.save()
     assert uslugi.nazwa_repo_studenta(przydzial, "PythonUniversity") == "set0_pythonuniversity"
+
+
+# --- Prowadzacy zmienia plik w repozytorium studenta ---
+
+STUDENT, PROWADZACY = 77, 38453366
+
+
+def _porownania_z_drzew(github, monkeypatch):
+    """Porownanie jak w prawdziwym kliencie: roznica drzew dwoch stanow."""
+    def porownaj(pelna, od, do):
+        a, b = github.drzewa[od], github.drzewa[do]
+        return sorted(s for s in set(a) | set(b) if a.get(s) != b.get(s))
+
+    monkeypatch.setattr(uslugi.gh, "porownaj", porownaj)
+
+
+def _push(z, przed, po, godzin_temu, autor_id):
+    Wypchniecie.objects.create(
+        repo_id=z.repo_id, repo_nazwa=z.repo_nazwa, ref="refs/heads/main", sha_przed=przed * 40, sha_po=po * 40,
+        czas=timezone.now() - timedelta(hours=godzin_temu),
+        autor="jank" if autor_id == STUDENT else "witoldprzygoda", autor_id=autor_id, zrodlo="webhook")
+
+
+def _przed_terminem(przydzial):
+    teraz = timezone.now()
+    przydzial.termin_miekki, przydzial.termin_twardy = teraz + timedelta(days=2), teraz + timedelta(days=9)
+    przydzial.save()
+
+
+BAZA0 = {"ZADANIE1/zadanie1.py": "1", "ZADANIE1/tests/test_zadanie1.py": "2", "ZADANIE2/zadanie2.py": "3",
+         "README.md": "4"}
+
+
+@pytest.mark.django_db
+def test_prowadzacy_poprawil_plik_studenta_praca_nadal_oddana(github, przydzial, monkeypatch):
+    """Student zmienil zadanie1.py, potem prowadzacy (swoim kontem) poprawil ten sam plik."""
+    z = _zgloszenie_gotowe(przydzial, github)
+    _przed_terminem(przydzial)
+    _porownania_z_drzew(github, monkeypatch)
+    github.drzewa = {"b" * 40: BAZA0, "c" * 40: BAZA0,
+                     "d" * 40: {**BAZA0, "ZADANIE1/zadanie1.py": "S"},
+                     "e" * 40: {**BAZA0, "ZADANIE1/zadanie1.py": "P"}}
+    _push(z, "c", "d", 48, STUDENT)
+    _push(z, "d", "e", 2, PROWADZACY)
+    uslugi.przelicz(z)
+    z.refresh_from_db()
+    assert z.stan_kolor == "niebieski", z.stan_opis
+    assert z.stan_pracy.klucz == "w_terminie"
+    assert "Pominięto wypchnięcia z innych kont" in z.stan_opis
+
+
+@pytest.mark.django_db
+def test_poprawka_prowadzacego_w_nietknietym_pliku_to_nie_praca_studenta(github, przydzial, monkeypatch):
+    """Prowadzacy poprawil plik, ktorego student nie ruszal: to nadal brak pracy studenta."""
+    z = _zgloszenie_gotowe(przydzial, github)
+    _przed_terminem(przydzial)
+    _porownania_z_drzew(github, monkeypatch)
+    github.drzewa = {"b" * 40: BAZA0, "c" * 40: BAZA0, "d" * 40: {**BAZA0, "ZADANIE2/zadanie2.py": "P"}}
+    _push(z, "c", "d", 2, PROWADZACY)
+    uslugi.przelicz(z)
+    z.refresh_from_db()
+    assert z.stan_pracy.klucz == "otwarte", z.stan_opis
+
+
+@pytest.mark.django_db
+def test_student_zmienia_inny_plik_po_poprawce_prowadzacego(github, przydzial, monkeypatch):
+    """Poprawka prowadzacego w zadanie2.py nie jest praca studenta, ale jego zmiana w zadanie1.py jest."""
+    z = _zgloszenie_gotowe(przydzial, github)
+    _przed_terminem(przydzial)
+    _porownania_z_drzew(github, monkeypatch)
+    poprawka = {**BAZA0, "ZADANIE2/zadanie2.py": "P"}
+    github.drzewa = {"b" * 40: BAZA0, "c" * 40: BAZA0, "d" * 40: poprawka,
+                     "e" * 40: {**poprawka, "ZADANIE1/zadanie1.py": "S"}}
+    _push(z, "c", "d", 5, PROWADZACY)
+    _push(z, "d", "e", 2, STUDENT)
+    uslugi.przelicz(z)
+    z.refresh_from_db()
+    assert z.stan_pracy.klucz == "w_terminie", z.stan_opis
+
+
+@pytest.mark.django_db
+def test_polecenie_diagnoza(github, przydzial, monkeypatch):
+    from io import StringIO
+
+    from django.core.management import call_command
+    z = _zgloszenie_gotowe(przydzial, github)
+    _porownania_z_drzew(github, monkeypatch)
+    github.drzewa = {"c" * 40: BAZA0, "d" * 40: {**BAZA0, "README.md": "R"}}
+    _push(z, "c", "d", 1, STUDENT)
+    github.aktywnosci[z.repo_nazwa] = [
+        {"timestamp": "2026-10-31T00:05:00Z", "ref": "refs/heads/main", "activity_type": "push",
+         "before": "c" * 40, "after": "d" * 40, "actor": {"login": "jank", "id": STUDENT}},
+        {"timestamp": "2026-10-31T00:06:00Z", "ref": "refs/heads/proba", "activity_type": "branch_creation",
+         "before": "0" * 40, "after": "e" * 40, "actor": {"login": "jank", "id": STUDENT}},
+    ]
+    wyjscie = StringIO()
+    call_command("diagnoza", "jank", stdout=wyjscie)
+    tekst = wyjscie.getvalue()
+    assert "Adres w aplikacji GitHub: http://testserver/github/webhook/" in tekst and "UWAGA" not in tekst
+    assert "push" in tekst and "odpowiedź 200" in tekst
+    assert "zmiany: README.md [bez kodu]" in tekst and "(id 77, student)" in tekst
+    assert "w bazie: tak" in tekst and "proba" in tekst and "w bazie: NIE" in tekst

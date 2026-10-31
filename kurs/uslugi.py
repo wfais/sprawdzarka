@@ -451,6 +451,11 @@ def _wersje_prowadzacego(zgloszenie: Zgloszenie, obce: Sequence, tylko_testy: bo
 
     Zrodla: kolejne stany startowe grupy (gdy byly poprawki) i wypchniecia z innych kont niz konto studenta.
     Plik w takiej wersji nie jest zmiana studenta, nawet jesli rozni sie od biezacego stanu startowego.
+
+    Plik z kodem zmieniony wypchnieciem z innego konta jest wersja prowadzacego tylko wtedy, gdy przed tym
+    wypchnieciem mial wersje startowa albo wczesniejsza wersje prowadzacego. Jesli prowadzacy poprawil plik,
+    ktory student juz zmienil, wynik nadal jest praca studenta (inaczej praca "znikalaby" z terminow i oceny).
+    Pliki testow prowadzacego zmienione z innego konta zawsze sa jego wersja.
     """
     wersje: dict = {}
 
@@ -473,6 +478,7 @@ def _wersje_prowadzacego(zgloszenie: Zgloszenie, obce: Sequence, tylko_testy: bo
             for sciezka in set(poprzednie or {}) - set(drzewo):
                 dodaj(sciezka, None)
             poprzednie = drzewo
+    startowe = None
     for p in obce:
         if not p.sha_przed or p.sha_przed == ZERO_SHA:
             continue
@@ -484,7 +490,22 @@ def _wersje_prowadzacego(zgloszenie: Zgloszenie, obce: Sequence, tylko_testy: bo
             drzewo = gh.drzewo_blobow(zgloszenie.repo_nazwa, p.sha_po)
         except gh.BladGitHub:
             continue
+        kod = [s for s in pliki if not uruchamianie.nalezy_do_prowadzacego(s)]
+        przed = None
+        if kod:
+            try:
+                przed = gh.drzewo_blobow(zgloszenie.repo_nazwa, p.sha_przed)
+                if startowe is None:
+                    startowe = gh.drzewo_blobow(zgloszenie.repo_nazwa, zgloszenie.sha_bazowy)
+            except gh.BladGitHub:
+                przed = None  # bez pewnosci plik z kodem zostaje praca studenta
         for sciezka in pliki:
+            if sciezka in kod:
+                if przed is None:
+                    continue
+                poprzednia = przed.get(sciezka)
+                if poprzednia != startowe.get(sciezka) and poprzednia not in wersje.get(sciezka, ()):
+                    continue  # prowadzacy zmienil prace studenta: to nadal praca studenta
             dodaj(sciezka, drzewo.get(sciezka))
     return wersje
 

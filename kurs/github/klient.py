@@ -126,6 +126,21 @@ def jwt_aplikacji() -> str:
     return jwt.encode(dane, _klucz_prywatny(), algorithm="RS256")
 
 
+def _jako_aplikacja(sciezka: str, params: Optional[dict] = None) -> Any:
+    """Zapytanie uwierzytelnione samym kluczem aplikacji (ustawienia aplikacji, nie repozytoria)."""
+    return _sprawdz(_wyslij("GET", _url(sciezka), jwt_aplikacji(), params=params), (200,)).json()
+
+
+def adres_webhooka() -> str:
+    """Adres, pod ktory GitHub wysyla powiadomienia aplikacji (do diagnozy)."""
+    return (_jako_aplikacja("/app/hook/config") or {}).get("url", "")
+
+
+def dostawy_webhookow(ile: int = 20) -> list[dict]:
+    """Ostatnie powiadomienia wyslane przez GitHub do aplikacji: czas, zdarzenie, kod odpowiedzi serwera."""
+    return _jako_aplikacja("/app/hook/deliveries", {"per_page": ile}) or []
+
+
 def id_instalacji() -> int:
     if settings.GITHUB_INSTALLATION_ID:
         return int(settings.GITHUB_INSTALLATION_ID)
@@ -238,9 +253,9 @@ def porownaj(pelna: str, sha_od: str, sha_do: str) -> list[str]:
     return sorted(s for s in set(od) | set(do) if od.get(s) != do.get(s))
 
 
-def aktywnosc(pelna: str, galaz: str) -> Iterator[dict]:
-    """Dziennik aktywnosci repozytorium (wypchniecia z czasem zarejestrowanym przez GitHub)."""
-    yield from stronicuj(f"/repos/{pelna}/activity", {"ref": f"refs/heads/{galaz}"})
+def aktywnosc(pelna: str, galaz: Optional[str]) -> Iterator[dict]:
+    """Dziennik aktywnosci repozytorium (wypchniecia z czasem zarejestrowanym przez GitHub); galaz None: wszystkie."""
+    yield from stronicuj(f"/repos/{pelna}/activity", {"ref": f"refs/heads/{galaz}"} if galaz else None)
 
 
 def pobierz_archiwum(pelna: str, ref: str) -> bytes:

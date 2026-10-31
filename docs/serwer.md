@@ -194,5 +194,6 @@ docker compose ps                    # stan kontenerów instancji
 docker compose logs -f web robot     # dziennik serwisu i robota
 docker compose restart               # ponowne uruchomienie instancji
 docker compose exec web python manage.py <polecenie>   # np. poligon, createsuperuser
+docker compose exec web python manage.py diagnoza <login>   # powiadomienia GitHub i wypchnięcia studenta
 docker system df                     # miejsce zajęte przez Dockera
 ```
