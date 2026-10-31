@@ -1032,8 +1032,14 @@ def zgloszenie_ocena(request, pk):
 @require_POST
 def zgloszenie_zeruj(request, pk):
     zgl = _zgloszenie(pk)
-    for komunikat in uslugi.wyzeruj(zgl, usun_repo=request.POST.get("usun_repo") == "1"):
-        messages.info(request, komunikat)
+    try:
+        komunikaty = uslugi.wyzeruj(zgl, usun_repo=request.POST.get("usun_repo") == "1")
+    except uslugi.BLEDY as blad:
+        messages.error(request, f"GitHub nie wykonał zerowania ({blad}). Zgłoszenie zostało bez zmian, "
+                                "spróbuj ponownie za chwilę.")
+    else:
+        for komunikat in komunikaty:
+            messages.info(request, komunikat)
     return redirect("panel:przydzial", pk=zgl.przydzial_id)
 
 

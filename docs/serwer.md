@@ -132,10 +132,14 @@ W ustawieniach aplikacji (`https://github.com/organizations/wfais/settings/apps`
 
 - **Callback URL**: dodaj `https://srv2095410.hstgr.cloud/auth/github/powrot/` (adres `localhost` możesz zostawić do prób),
 - **Homepage URL**: `https://srv2095410.hstgr.cloud`,
+- **Webhook**: pole **Active** zaznaczone,
 - **Webhook URL**: `https://srv2095410.hstgr.cloud/github/webhook/`,
 - **Webhook secret**: ten sam ciąg co `GITHUB_WEBHOOK_SECRET` w `.env` serwera.
 
-Zapisz (Save changes). W zakładce **Advanced** aplikacji widać dostarczone powiadomienia i odpowiedź serwera (200).
+Zapisz (Save changes). Potem w zakładce **Permissions & events**, w sekcji **Subscribe to events**, zaznacz **Push**
+i znów zapisz (ta sekcja pojawia się dopiero po włączeniu Active). Bez tego GitHub nie wysyła powiadomień, a panel
+widzi nowe zmiany studentów dopiero po przebiegu robota (co 30 minut) albo po „Odśwież z GitHub”.
+W zakładce **Advanced** aplikacji widać dostarczone powiadomienia i odpowiedź serwera (200 albo 202).
 
 ## 9. Sprawdzenie
 

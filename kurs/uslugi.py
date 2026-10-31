@@ -739,36 +739,54 @@ def ponow_zaproszenie(zgloszenie: Zgloszenie) -> None:
 # --- Zerowanie zgloszenia ---
 
 def wyzeruj(zgloszenie: Zgloszenie, usun_repo: bool = False) -> list[str]:
-    """Odlacza zgloszenie, aby student mogl zaakceptowac zestaw od nowa. Zwraca komunikaty."""
+    """Odlacza zgloszenie, aby student mogl zaakceptowac zestaw od nowa. Zwraca komunikaty.
+
+    Blad GitHub (np. w czasie awarii) przerywa zerowanie, a zgloszenie zostaje aktywne i mozna je powtorzyc.
+    Oznaczenie mimo bledu dawalo studentowi drugie repozytorium (z przyrostkiem -2) obok starego,
+    do ktorego nadal mial dostep.
+    """
     komunikaty = []
     if zgloszenie.repo_nazwa and not _w_poligonie(zgloszenie):
-        try:
-            gh.odbierz_dostep(zgloszenie.repo_nazwa, zgloszenie.student.login)
-        except gh.BladGitHub as blad:
-            komunikaty.append(f"Nie udało się odebrać dostępu do repozytorium: {blad}")
-        try:
-            if usun_repo:
-                # GitHub usuwa repozytorium z opoznieniem i do tego czasu nazwa jest zajeta, wiec ponowna
-                # akceptacja konczylaby sie bledem. Zmiana nazwy przed usunieciem od razu zwalnia nazwe.
-                krotka = zgloszenie.repo_nazwa.split("/", 1)[-1]
-                do_usuniecia = zgloszenie.repo_nazwa
-                try:
-                    nowa = f"{krotka}-usuniete-{timezone.localtime():%Y%m%d%H%M}"[:100]
-                    do_usuniecia = gh.zmien_nazwe(zgloszenie.repo_nazwa, nowa)["full_name"]
-                except gh.BladGitHub as blad:
-                    log.info("Zmiana nazwy przed usunieciem %s nieudana: %s", zgloszenie.repo_nazwa, blad)
-                gh.usun_repo(do_usuniecia)
-                komunikaty.append(f"Repozytorium {zgloszenie.repo_nazwa} usunięte.")
-            else:
-                krotka = zgloszenie.repo_nazwa.split("/", 1)[-1]
-                nowa = f"{krotka}-arch-{timezone.localtime():%Y%m%d%H%M}"[:100]
-                dane = gh.zmien_nazwe(zgloszenie.repo_nazwa, nowa)
-                gh.archiwizuj(dane["full_name"])
-                zgloszenie.repo_nazwa = dane["full_name"]
-                komunikaty.append(f"Repozytorium przeniesione do archiwum jako {dane['full_name']}.")
-        except gh.BladGitHub as blad:
-            komunikaty.append(f"Nie udało się zarchiwizować ani usunąć repozytorium: {blad}")
+        komunikaty.append(_odlacz_repo(zgloszenie, usun_repo))
     zgloszenie.status = Zgloszenie.Status.WYZEROWANE
     zgloszenie.save(update_fields=["status", "repo_nazwa"])
     komunikaty.append("Zgłoszenie wyzerowane, student może ponownie zaakceptować zestaw.")
     return komunikaty
+
+
+def _odlacz_repo(zgloszenie: Zgloszenie, usun_repo: bool) -> str:
+    """Odbiera studentowi dostep, potem usuwa albo archiwizuje repozytorium. Bledy GitHub ida wyzej."""
+    try:
+        gh.odbierz_dostep(zgloszenie.repo_nazwa, zgloszenie.student.login)
+    except gh.BladGitHub as blad:
+        if blad.status != 404:
+            raise
+        return f"Repozytorium {zgloszenie.repo_nazwa} już nie istnieje."
+    pierwotna = zgloszenie.repo_nazwa
+    if usun_repo:
+        # GitHub usuwa repozytorium z opoznieniem i do tego czasu nazwa jest zajeta, wiec ponowna
+        # akceptacja konczylaby sie bledem. Zmiana nazwy przed usunieciem od razu zwalnia nazwe.
+        try:
+            _zmien_nazwe_przed_zerowaniem(zgloszenie, "usuniete")
+        except gh.BladGitHub as blad:
+            log.info("Zmiana nazwy przed usunieciem %s nieudana: %s", zgloszenie.repo_nazwa, blad)
+        try:
+            gh.usun_repo(zgloszenie.repo_nazwa)
+        except gh.BladGitHub as blad:
+            if blad.status != 404:  # 404: juz usuniete
+                raise
+        return f"Repozytorium {pierwotna} usunięte."
+    _zmien_nazwe_przed_zerowaniem(zgloszenie, "arch")
+    gh.archiwizuj(zgloszenie.repo_nazwa)
+    return f"Repozytorium przeniesione do archiwum jako {zgloszenie.repo_nazwa}."
+
+
+def _zmien_nazwe_przed_zerowaniem(zgloszenie: Zgloszenie, znacznik: str) -> None:
+    """Nowa nazwa trafia od razu do bazy, wiec ponowione zerowanie nie zmienia jej drugi raz."""
+    krotka = zgloszenie.repo_nazwa.split("/", 1)[-1]
+    czesci = krotka.rsplit("-", 2)
+    if len(czesci) == 3 and czesci[1] == znacznik and czesci[2].isdigit():
+        return
+    nowa = f"{krotka}-{znacznik}-{timezone.localtime():%Y%m%d%H%M}"[:100]
+    zgloszenie.repo_nazwa = gh.zmien_nazwe(zgloszenie.repo_nazwa, nowa)["full_name"]
+    zgloszenie.save(update_fields=["repo_nazwa"])

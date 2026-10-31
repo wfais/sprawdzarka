@@ -140,6 +140,11 @@ def adres_webhooka() -> str:
     return (_jako_aplikacja("/app/hook/config") or {}).get("url", "")
 
 
+def zdarzenia_aplikacji() -> list[str]:
+    """Zdarzenia, o ktorych GitHub powiadamia aplikacje (pusta lista: webhook wylaczony albo nic nie zaznaczono)."""
+    return (_jako_aplikacja("/app") or {}).get("events") or []
+
+
 def dostawy_webhookow(ile: int = 20) -> list[dict]:
     """Ostatnie powiadomienia wyslane przez GitHub do aplikacji: czas, zdarzenie, kod odpowiedzi serwera."""
     return _jako_aplikacja("/app/hook/deliveries", {"per_page": ile}) or []

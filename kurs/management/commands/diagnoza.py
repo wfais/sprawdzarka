@@ -57,6 +57,10 @@ class Command(BaseCommand):
             oczekiwany = settings.PUBLICZNY_ADRES + reverse("github_webhook")
             self.stdout.write(f"Adres w aplikacji GitHub: {adres or '(pusty)'}"
                               + ("" if adres == oczekiwany else f"  UWAGA: oczekiwany {oczekiwany}"))
+            zdarzenia = gh.zdarzenia_aplikacji()
+            self.stdout.write(f"Zdarzenia aplikacji: {', '.join(zdarzenia) or '(brak)'}"
+                              + ("" if "push" in zdarzenia else "  UWAGA: GitHub nie wysyła powiadomień o zmianach; "
+                                 "w ustawieniach aplikacji włącz Webhook Active i zaznacz Push"))
             dostawy = gh.dostawy_webhookow(ile)
         except gh.BladGitHub as blad:
             self.stdout.write(f"Nie udało się odczytać: {blad}")

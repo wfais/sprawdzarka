@@ -112,16 +112,62 @@ def test_nazwa_w_trakcie_usuwania_dostaje_przyrostek(github, przydzial, monkeypa
 
 
 @pytest.mark.django_db
-def test_nazwa_zajeta_przez_stare_zgloszenie_dostaje_przyrostek(github, przydzial, monkeypatch):
+def test_nazwa_zajeta_przez_stare_zgloszenie_dostaje_przyrostek(github, przydzial):
+    """Zgloszenie wyzerowane przez starsza wersje mimo bledu GitHub: stare repozytorium ma nadal te nazwe."""
     z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
-    # Zmiana nazwy przy zerowaniu sie nie udala: stare repozytorium nadal ma te sama nazwe
-    def odmowa(pelna, nowa):
-        raise uslugi.gh.BladGitHub(403, "brak uprawnien")
-
-    monkeypatch.setattr(uslugi.gh, "zmien_nazwe", odmowa)
-    uslugi.wyzeruj(z1)
+    Zgloszenie.objects.filter(pk=z1.pk).update(status=Zgloszenie.Status.WYZEROWANE)
     z2 = uslugi.akceptuj(przydzial, 77, "jank", "")
     assert z2.repo_nazwa == "wfais/py-z03-g4-jank-2"
+
+
+@pytest.mark.django_db
+def test_blad_github_przy_zerowaniu_zostawia_zgloszenie(github, przydzial, monkeypatch):
+    """Awaria GitHub w czasie zerowania: zgloszenie bez zmian, ponowna akceptacja nie daje drugiego repozytorium."""
+    z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+
+    def awaria(*args):
+        raise uslugi.gh.BladGitHub(502, "awaria")
+
+    monkeypatch.setattr(uslugi.gh, "odbierz_dostep", awaria)
+    with pytest.raises(uslugi.gh.BladGitHub):
+        uslugi.wyzeruj(z1, usun_repo=True)
+    z1.refresh_from_db()
+    assert z1.status == Zgloszenie.Status.GOTOWE and z1.repo_nazwa == "wfais/py-z03-g4-jank"
+    assert github.usuniete == [] and github.archiwum == []
+    assert uslugi.akceptuj(przydzial, 77, "jank", "").pk == z1.pk
+
+
+@pytest.mark.django_db
+def test_ponowione_zerowanie_po_bledzie_usuwania(github, przydzial, monkeypatch):
+    z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+    usun = uslugi.gh.usun_repo
+
+    def awaria(pelna):
+        raise uslugi.gh.BladGitHub(502, "awaria")
+
+    monkeypatch.setattr(uslugi.gh, "usun_repo", awaria)
+    with pytest.raises(uslugi.gh.BladGitHub):
+        uslugi.wyzeruj(z1, usun_repo=True)
+    z1.refresh_from_db()
+    assert z1.status == Zgloszenie.Status.GOTOWE and z1.repo_nazwa.startswith("wfais/py-z03-g4-jank-usuniete-")
+    monkeypatch.setattr(uslugi.gh, "usun_repo", usun)
+    uslugi.wyzeruj(z1, usun_repo=True)
+    z1.refresh_from_db()
+    assert z1.status == Zgloszenie.Status.WYZEROWANE
+    assert github.usuniete == [z1.repo_nazwa]  # nazwa zmieniona tylko raz
+
+
+@pytest.mark.django_db
+def test_zerowanie_gdy_repozytorium_juz_nie_istnieje(github, przydzial, monkeypatch):
+    z1 = uslugi.akceptuj(przydzial, 77, "jank", "Jan Kowalski")
+
+    def brak(*args):
+        raise uslugi.gh.BladGitHub(404, "Not Found")
+
+    monkeypatch.setattr(uslugi.gh, "odbierz_dostep", brak)
+    komunikaty = uslugi.wyzeruj(z1)
+    z1.refresh_from_db()
+    assert z1.status == Zgloszenie.Status.WYZEROWANE and any("nie istnieje" in k for k in komunikaty)
 
 
 def _zgloszenie_gotowe(przydzial, github):
@@ -652,6 +698,7 @@ def test_polecenie_diagnoza(github, przydzial, monkeypatch):
     call_command("diagnoza", "jank", stdout=wyjscie)
     tekst = wyjscie.getvalue()
     assert "Adres w aplikacji GitHub: http://testserver/github/webhook/" in tekst and "UWAGA" not in tekst
+    assert "Zdarzenia aplikacji: push" in tekst
     assert "push" in tekst and "odpowiedź 200" in tekst
     assert "zmiany: README.md [bez kodu]" in tekst and "(id 77, student)" in tekst
     assert "Dostęp na GitHubie: uprawnienie write, zaproszenie oczekuje: nie" in tekst and "UWAGA" not in tekst
@@ -659,4 +706,8 @@ def test_polecenie_diagnoza(github, przydzial, monkeypatch):
     wyjscie = StringIO()
     call_command("diagnoza", "jank", stdout=wyjscie)
     assert "student nie przyjął zaproszenia" in wyjscie.getvalue()
+    monkeypatch.setattr(uslugi.gh, "zdarzenia_aplikacji", lambda: [])
+    wyjscie = StringIO()
+    call_command("diagnoza", stdout=wyjscie)
+    assert "Zdarzenia aplikacji: (brak)  UWAGA: GitHub nie wysyła powiadomień" in wyjscie.getvalue()
     assert "w bazie: tak" in tekst and "proba" in tekst and "w bazie: NIE" in tekst

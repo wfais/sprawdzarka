@@ -138,6 +138,9 @@ class FalszywyGitHub:
     def adres_webhooka(self):
         return "http://testserver/github/webhook/"
 
+    def zdarzenia_aplikacji(self):
+        return ["push"]
+
     def dostawy_webhookow(self, ile=20):
         return [{"delivered_at": "2026-10-31T00:10:00Z", "event": "push", "status_code": 200, "status": "OK",
                  "repository_id": 1001}]
@@ -196,7 +199,7 @@ class FalszywyGitHub:
 
 FUNKCJE_KLIENTA = [
     "utworz_repo", "ustaw_galaz_domyslna", "zapros", "utworz_pr", "porownaj", "aktywnosc", "readme",
-    "adres_webhooka", "dostawy_webhookow", "dostep_studenta",
+    "adres_webhooka", "zdarzenia_aplikacji", "dostawy_webhookow", "dostep_studenta",
     "komentarz_pr", "zamknij_pr", "odbierz_dostep", "zmien_nazwe", "archiwizuj", "usun_repo",
     "pobierz_archiwum", "drzewo_plikow", "recenzja_pr", "chron_galaz", "drzewo_blobow",
     "sha_galezi", "zezwol_aplikacji_na_galaz", "czy_zawiera",
