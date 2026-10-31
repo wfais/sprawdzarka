@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import user_passes_test
-from django.db.models import Count, F, Max, Prefetch, Q
+from django.db.models import Count, Max, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -1514,30 +1514,13 @@ def modele_sprawdz(request):
     return _do_ustawien("#modele")
 
 
-# Kolejnosc stanow oceny automatycznej: dla zgloszenia liczy sie najlepszy
-_STAN_OCENY = {"gotowe": 0, "w_toku": 1, "bledy": 2}
-_W_TOKU = {Ewaluacja.Status.OCZEKUJE, Ewaluacja.Status.TESTY, Ewaluacja.Status.MODELE}
-
-
 def _przydzialy_do_oceny():
     """Wszystkie zestawy wydane grupom (z lat i przedmiotow widocznych na pulpicie), takze bez
-    zaakceptowanych prac: ocena automatyczna aktualnej wersji kodu i wystawione oceny."""
+    zaakceptowanych prac, z licznikiem wystawionych ocen."""
     przydzialy = list(_dolacz_liczniki(
         Przydzial.objects.filter(zestaw__kurs__ukryty=False, zestaw__kurs__rok__ukryty=False,
                                  zestaw__kurs__rok__zarchiwizowany=False)
         .select_related("zestaw__kurs__rok__uczelnia", "grupa")))
-    mapa = {p.pk: p for p in przydzialy}
-    for p in przydzialy:
-        p.automatyczne = dict.fromkeys(_STAN_OCENY, 0)
-    aktywne = Zgloszenie.objects.filter(przydzial_id__in=mapa).exclude(status=Zgloszenie.Status.WYZEROWANE)
-    najlepsze = {}
-    for zgl, pk, status in (Ewaluacja.objects.filter(zgloszenie__in=aktywne, sha=F("zgloszenie__sha_oceniany"))
-                            .values_list("zgloszenie_id", "zgloszenie__przydzial_id", "status")):
-        stan = "gotowe" if status == Ewaluacja.Status.GOTOWA else "w_toku" if status in _W_TOKU else "bledy"
-        if zgl not in najlepsze or _STAN_OCENY[stan] < _STAN_OCENY[najlepsze[zgl][1]]:
-            najlepsze[zgl] = (pk, stan)
-    for pk, stan in najlepsze.values():
-        mapa[pk].automatyczne[stan] += 1
     przydzialy.sort(key=lambda p: (p.dioda_ocen != "czerwony" and p.dioda_ocen != "fiolet", p.zestaw.kurs.rok.poligon,
                                    p.termin_twardy))
     return przydzialy
