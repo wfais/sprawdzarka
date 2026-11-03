@@ -1,6 +1,7 @@
 # Sprawdzarka na serwerze (Ubuntu, Docker)
 
 Instrukcja dla serwera z Ubuntu 24.04 lub 26.04 (np. VPS Hostinger) z dostępem `root` przez SSH.
+Maszyna w Oracle Cloud (procesor ARM, darmowy plan): [serwer-oracle.md](serwer-oracle.md).
 
 ## Jak to działa
 

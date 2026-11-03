@@ -81,7 +81,8 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 1g
-    cpus: 2
+    # Nie wiecej niz rdzeni maszyny (na serwerze z jednym rdzeniem TESTER_CPU=1 w pliku .env)
+    cpus: ${TESTER_CPU:-2}
     pids_limit: 256
 
   caddy:
