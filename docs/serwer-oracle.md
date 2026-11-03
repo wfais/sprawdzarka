@@ -3,20 +3,22 @@
 Maszyna `VM.Standard.A1.Flex` (procesor ARM), Ubuntu 26.04, logowanie jako `ubuntu` z `sudo`.
 Wszystkie składniki Sprawdzarki (Python, PostgreSQL, Caddy, biblioteki) mają wersje na ARM.
 
-Instalacja próbna nie wymaga domeny, otwierania portów ani aplikacji GitHub: panel otwierasz przez tunel SSH,
-a ćwiczysz na poligonie (dane fikcyjne, bez GitHuba) z modelami na niby albo prawdziwymi kluczami.
+Instalacja próbna:
 
-## 1. Logowanie i plik wymiany
+- adres `https://sprawdzarka.130-61-129-125.sslip.io` (usługa sslip.io kieruje taką nazwę na adres IP zawarty
+  w nazwie, więc nie trzeba zakładać domeny),
+- HTTPS daje Caddy, który już działa na maszynie (ten od notatek); dochodzi do niego jeden wpis,
+- logowanie przez GitHub tylko dla kont wpisanych w `PANEL_KONTA_GITHUB`, każde z nich jest prowadzącym,
+- osobna aplikacja GitHub wyłącznie do logowania: bez instalacji w wfais i bez klucza prywatnego,
+  więc z tej instancji nie da się dotknąć repozytoriów studentów,
+- ćwiczenia na poligonie (dane fikcyjne) z modelami na niby (`demo`).
 
-Na swoim komputerze (Git Bash):
+Wszyscy zalogowani pracują na tych samych danych.
+
+## 1. Plik wymiany (jeśli jeszcze go nie ma)
 
 ```bash
 ssh ubuntu@130.61.129.125
-```
-
-Na serwerze (plik wymiany 4 GB, używany tylko w razie braku pamięci):
-
-```bash
 sudo fallocate -l 4G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
@@ -32,29 +34,10 @@ Dalej pracujesz jako `root`:
 sudo -i
 ```
 
-## 2. Docker
+## 2. Docker (jeśli jeszcze go nie ma)
 
-```bash
-apt update && apt upgrade -y
-apt install -y ca-certificates curl git
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-tee /etc/apt/sources.list.d/docker.sources <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-apt update
-apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-systemctl enable --now docker
-docker run --rm hello-world
-```
-
-Ostatnie polecenie powinno wypisać „Hello from Docker!”. Na Oracle nie włączaj `ufw`: zaporę tworzą tu reguły Oracle.
+Instalacja jak w [serwer.md](serwer.md), punkt 3 (polecenia same wykrywają procesor ARM).
+Na Oracle nie włączaj `ufw`: zaporę tworzą tu reguły Oracle.
 
 Sprawdzenie, czy kontenery mają dostęp do internetu (potrzebny przy budowaniu obrazu):
 
@@ -71,7 +54,25 @@ netfilter-persistent save
 systemctl restart docker
 ```
 
-## 3. Kod i plik `.env`
+## 3. Aplikacja GitHub do logowania
+
+Na swoim koncie (nie w organizacji wfais): `https://github.com/settings/apps/new`
+
+| Pole | Wartość |
+|---|---|
+| GitHub App name | np. `Sprawdzarka test WP` (nazwa musi być unikalna w całym GitHubie) |
+| Homepage URL | `https://sprawdzarka.130-61-129-125.sslip.io` |
+| Callback URL | `https://sprawdzarka.130-61-129-125.sslip.io/auth/github/powrot/` |
+| Expire user authorization tokens | zaznaczone (domyślnie) |
+| Request user authorization (OAuth) during installation | niezaznaczone |
+| Webhook: Active | **odznaczone** |
+| Permissions | bez zmian (żadnych uprawnień) |
+| Where can this GitHub App be installed | Only on this account |
+
+Po utworzeniu (Create GitHub App) zapisz **Client ID** i kliknij **Generate a new client secret** (sekret widać tylko
+raz). Klucza prywatnego nie generuj i aplikacji nigdzie nie instaluj: do logowania nie jest to potrzebne.
+
+## 4. Kod i plik `.env`
 
 ```bash
 git clone https://github.com/wfais/sprawdzarka.git /opt/sprawdzarka-test
@@ -80,64 +81,84 @@ cd /opt/sprawdzarka-test
 cat > .env <<EOF
 DJANGO_SECRET_KEY=$(openssl rand -hex 32)
 DJANGO_DEBUG=0
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-PUBLICZNY_ADRES=http://localhost:8100
+DJANGO_ALLOWED_HOSTS=sprawdzarka.130-61-129-125.sslip.io
+PUBLICZNY_ADRES=https://sprawdzarka.130-61-129-125.sslip.io
 POSTGRES_PASSWORD=$(openssl rand -hex 32)
 ADRES_WEB=127.0.0.1
 PORT_WEB=8000
-PANEL_LOGOWANIE_HASLEM=1
+GITHUB_APP_CLIENT_ID=
+GITHUB_APP_CLIENT_SECRET=
+PANEL_KONTA_GITHUB=witoldprzygoda
+PANEL_LOGOWANIE_HASLEM=0
 OCENIAJACE_MODELE=demo:a,demo:b,demo:c
 TESTER_CPU=$(nproc)
 EOF
 chmod 600 .env
+nano .env
 ```
 
-`TESTER_CPU` przyjmuje liczbę rdzeni maszyny (przy jednym rdzeniu Docker nie uruchomi testera z limitem 2).
-Prawdziwe modele: zamiast `demo:...` wpisz listę modeli i klucze tak jak na komputerze (`nano .env`).
+W `nano` uzupełnij `GITHUB_APP_CLIENT_ID` i `GITHUB_APP_CLIENT_SECRET` z punktu 3
+(zapis: Ctrl+O, Enter, wyjście: Ctrl+X).
 
-## 4. Uruchomienie
+## 5. Uruchomienie
 
 ```bash
 docker compose up -d --build
 docker compose ps
 curl -s http://127.0.0.1:8000/zdrowie/
-docker compose exec web python manage.py createsuperuser
 ```
 
 Pierwsze budowanie na ARM trwa kilka minut. `docker compose ps` powinien pokazać `baza`, `web`, `robot` i `tester`
-w stanie `running`, `curl` wypisać `ok`. Ostatnie polecenie zakłada konto do panelu (login i hasło).
+w stanie `running`, `curl` wypisać `ok`.
 
-## 5. Panel przez tunel SSH
+## 6. Wpis w Caddy
 
-Na swoim komputerze, w osobnym oknie Git Bash (okno zostaje otwarte, dopóki pracujesz):
+Caddy od notatek musi działać w sieci serwera (wtedy widzi `127.0.0.1:8000`) i trzeba znaleźć jego katalog:
 
 ```bash
-ssh -N -L 8100:127.0.0.1:8000 ubuntu@130.61.129.125
+docker inspect python-notatki-caddy-1 --format '{{ .HostConfig.NetworkMode }}'
+docker inspect python-notatki-caddy-1 --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}'
 ```
 
-W przeglądarce: `http://localhost:8100/panel/`, logowanie hasłem. Poligon tworzysz w Ustawieniach.
-Port 8100 (a nie 8000) nie koliduje ze Sprawdzarką uruchomioną na komputerze.
+Pierwsze polecenie powinno wypisać `host`. Przejdź do katalogu z drugiego polecenia i dopisz na końcu jego `Caddyfile`:
 
-## 6. Sprawdzenie po restarcie i zużycie zasobów
+```
+sprawdzarka.130-61-129-125.sslip.io {
+	encode gzip
+	reverse_proxy 127.0.0.1:8000
+}
+```
+
+Potem w tym samym katalogu:
+
+```bash
+docker compose restart
+docker compose logs --tail 30
+```
+
+Po chwili w dzienniku: „certificate obtained successfully” dla nowej nazwy. Notatki działają jak wcześniej.
+
+## 7. Logowanie
+
+`https://sprawdzarka.130-61-129-125.sslip.io/panel/`, „Zaloguj przez GitHub”, przy pierwszym razie GitHub zapyta
+o zgodę dla aplikacji z punktu 3. Poligon tworzysz w Ustawieniach.
+
+Kolejni testujący: dopisz ich loginy GitHub po przecinku, np. `PANEL_KONTA_GITHUB=witoldprzygoda,login2,login3`,
+i w `/opt/sprawdzarka-test` wykonaj `docker compose up -d`.
+
+## 8. Restart i zużycie zasobów
 
 ```bash
 reboot
 ```
 
-Po minucie tunel i panel działają jak wcześniej. Zużycie pamięci i procesora: `docker stats --no-stream`, `free -h`.
+Po minucie strona działa jak wcześniej. Zużycie: `free -h`, `docker stats --no-stream`.
 
 Oracle może zatrzymać darmową maszynę, gdy przez 7 dni procesor, sieć i pamięć są jednocześnie poniżej 20%.
-Sprawdzarka zajmuje około 1,5 GB, czyli około 25% z 5,8 GB. Przy zmianie kształtu maszyny nie zwiększaj
-pamięci do 12 GB (zajętość spadłaby do około 12%); rozsądnie: 2 OCPU i około 6 GB.
+Sprawdzarka z systemem zajmuje około 1,5 GB: przy 6 GB to około 25%, przy 12 GB około 12%.
 
 ## Aktualizacja
 
 ```bash
 cd /opt/sprawdzarka-test && git pull && docker compose up -d --build
 ```
-
-## Później: pełna instancja z domeną
-
-Do prawdziwego obiegu ze studentami potrzebne będą: subdomena wskazująca na 130.61.129.125 (rekord A),
-osobna aplikacja GitHub ([aplikacja-github.md](aplikacja-github.md)), porty 80 i 443 otwarte w obu zaporach
-(lista reguł w konsoli Oracle i iptables na maszynie) oraz brama HTTPS jak w [serwer.md](serwer.md), punkt 7.
