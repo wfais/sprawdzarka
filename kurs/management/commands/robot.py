@@ -1,10 +1,11 @@
-"""Robot w tle: przelicza stany terminow, synchronizuje wypchniecia z GitHub i wykonuje ocene automatyczna."""
+"""Robot w tle: przelicza stany terminow, synchronizuje wypchniecia z GitHub, wykonuje ocene automatyczna
+i uruchamia przeplywy GitHub Actions wskazane w zestawach."""
 import logging
 import time
 
 from django.core.management.base import BaseCommand
 
-from kurs import ocena, poprawki, uslugi
+from kurs import ocena, poprawki, przeplywy, uslugi
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class Command(BaseCommand):
                 ("poprawki", lambda: poprawki.przetworz(limit=1)),
                 ("przerwane poprawki", lambda: pelny and poprawki.wznow_przerwane()),
                 ("scalenia poprawek", lambda: pelny and poprawki.sprawdz_scalenia()),
+                ("przeplywy GitHub Actions", lambda: pelny and przeplywy.cykl()),
             ):
                 try:
                     zadanie()

@@ -6,6 +6,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
@@ -175,6 +176,27 @@ class Zestaw(models.Model):
                   "a aplikacja GitHub potrzebuje uprawnienia Workflows. Domyślnie ten katalog jest pomijany. "
                   "Ustawienie działa przy tworzeniu repozytorium startowego grupy.",
     )
+
+    class StartPrzeplywu(models.TextChoices):
+        HARMONOGRAM = "harmonogram", "gdy student włączy harmonogram (schedule) w pliku przepływu"
+        ZAWSZE = "zawsze", "od razu, w każdym repozytorium studenta"
+
+    przeplyw_plik = models.CharField(
+        "uruchamiany przepływ GitHub Actions", max_length=100, blank=True,
+        help_text="Nazwa pliku z katalogu .github/workflows, np. traficar.yml. Robot uruchamia ten przepływ "
+                  "w repozytoriach studentów (jak przycisk Run workflow), bo harmonogram GitHub w nowych "
+                  "repozytoriach bywa zawodny. Puste: wyłączone. Wymaga kopiowania konfiguracji GitHub Actions, "
+                  "uprawnienia Actions aplikacji GitHub i włączenia w Ustawieniach.",
+    )
+    przeplyw_co_minut = models.PositiveIntegerField(
+        "uruchamiaj co (minut)", default=60, validators=[MinValueValidator(15)],
+        help_text="Odstęp między uruchomieniami. Robot sprawdza repozytoria co około 30 minut.",
+    )
+    przeplyw_start = models.CharField(
+        "uruchamiaj", max_length=20, choices=StartPrzeplywu.choices, default=StartPrzeplywu.HARMONOGRAM,
+        help_text="Uruchamianie kończy się samo, gdy przepływ zostanie wyłączony (także przez siebie samego) "
+                  "albo minie termin ostateczny.",
+    )
     utworzono = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -189,6 +211,14 @@ class Zestaw(models.Model):
 
     def __str__(self):
         return self.nazwa
+
+    def clean(self):
+        if self.przeplyw_plik:
+            if not re.fullmatch(r"[\w.-]+\.ya?ml", self.przeplyw_plik):
+                raise ValidationError({"przeplyw_plik": "Podaj samą nazwę pliku, np. traficar.yml."})
+            if not self.kopiuj_actions:
+                raise ValidationError({"przeplyw_plik": "Zaznacz też kopiowanie konfiguracji GitHub Actions, "
+                                                        "inaczej plik przepływu nie trafi do repozytoriów studentów."})
 
     def lista_wzorcow(self):
         wzorce = [w.strip() for w in re.split(r"[,\s]+", self.wzorce_kodu or "") if w.strip()]
@@ -334,6 +364,14 @@ ETYKIETY_ZMIAN_TESTOW = (
 )
 
 
+class StanPrzeplywu(models.TextChoices):
+    CZEKA = "czeka", "czeka na start"
+    DZIALA = "dziala", "uruchamiany"
+    ZAKONCZONY = "zakonczony", "zakończony"
+    BRAK = "brak", "brak przepływu"
+    BLAD = "blad", "błąd"
+
+
 class Zgloszenie(models.Model):
     """Akceptacja zestawu przez studenta wraz z jego repozytorium i stanem terminow."""
 
@@ -389,6 +427,12 @@ class Zgloszenie(models.Model):
     pr_zamkniety = models.BooleanField(default=False)
     oceniono = models.DateTimeField(null=True, blank=True)
     tresc_oceny_wyslana = models.TextField(blank=True)
+    # Uruchamianie przeplywu GitHub Actions przez robota (gdy zestaw je ma)
+    przeplyw_stan = models.CharField(max_length=20, choices=StanPrzeplywu.choices, blank=True)
+    przeplyw_opis = models.CharField(max_length=300, blank=True)
+    przeplyw_ostatnie = models.DateTimeField("ostatnie uruchomienie przepływu", null=True, blank=True)
+    przeplyw_wyzwolenia = models.PositiveIntegerField("uruchomienia przez Sprawdzarkę", default=0)
+    przeplyw_sprawdzono = models.DateTimeField(null=True, blank=True)
 
     utworzono = models.DateTimeField(auto_now_add=True)
     zaktualizowano = models.DateTimeField(auto_now=True)
@@ -786,6 +830,16 @@ class UstawieniaSerwisu(models.Model):
         "tryb serwisowy", default=False,
         help_text="Linki dla studentów pokazują stronę o pracach serwisowych; panel prowadzącego działa normalnie.",
     )
+    przeplywy_wlaczone = models.BooleanField(
+        "uruchamianie przepływów GitHub Actions", default=False,
+        help_text="Główny wyłącznik: robot uruchamia przepływy wskazane w zestawach tylko, gdy jest włączony.",
+    )
+    przeplywy_limit = models.PositiveIntegerField(
+        "dzienny limit uruchomień", default=1000,
+        help_text="Najwięcej uruchomień przepływów na dobę we wszystkich repozytoriach (ochrona minut organizacji).",
+    )
+    przeplywy_dzien = models.DateField(null=True, blank=True, editable=False)
+    przeplywy_licznik = models.PositiveIntegerField(default=0, editable=False)
     zmieniono = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -2,7 +2,7 @@
 {% block tytul %}Ustawienia{% endblock %}
 {% block tresc %}
 <div class="naglowek"><div><h1>Ustawienia</h1>
-  <p class="podtytul">Tryb serwisowy, modele oceniające, dostęp do panelu, archiwa lat akademickich, poligon do prób i bezpośredni dostęp do danych.</p></div></div>
+  <p class="podtytul">Tryb serwisowy, przepływy GitHub Actions, modele oceniające, dostęp do panelu, archiwa lat akademickich, poligon do prób i bezpośredni dostęp do danych.</p></div></div>
 
 <section class="karta" id="serwis">
   <h2>Tryb serwisowy</h2>
@@ -16,6 +16,28 @@
   </div>
   <p class="drugie male" style="margin:10px 0 0">Panel prowadzącego, robot i powiadomienia GitHub działają w tym czasie normalnie,
     a zmiany wysłane przez studentów liczą się według czasu wysłania.</p>
+</section>
+
+<section class="karta" id="przeplywy">
+  <h2>Przepływy GitHub Actions</h2>
+  <p class="drugie male">Robot co około 30 minut uruchamia przepływy wskazane w zestawach (pole „uruchamiany przepływ GitHub Actions”)
+    w repozytoriach studentów, tak jak przycisk <i>Run workflow</i>. Harmonogram GitHub (<code>schedule</code>) w nowych repozytoriach
+    bywa zawodny, a uruchomienie na żądanie działa zawsze. Aplikacja GitHub potrzebuje uprawnień <b>Actions</b> i <b>Workflows</b>
+    (odczyt i zapis). Uruchomienia zużywają minuty GitHub Actions organizacji.</p>
+  <p class="stan"><i class="dioda {% if przeplywy.ustawienia.przeplywy_wlaczone %}zielony{% else %}wylaczona{% endif %}" aria-hidden="true"></i>
+    {% if przeplywy.ustawienia.przeplywy_wlaczone %}<b>włączone</b>{% else %}wyłączone{% endif %};
+    dziś uruchomiono {{ przeplywy.dzisiaj }} z {{ przeplywy.ustawienia.przeplywy_limit }}</p>
+  <form method="post" action="{% url 'panel:przeplywy_ustawienia' %}" class="formularz" style="max-width:520px">{% csrf_token %}
+    {{ f_przeplywow.as_div }}
+    <div class="przyciski"><button class="maly glowny" type="submit">Zapisz</button></div>
+  </form>
+  {% if przeplywy.zestawy %}
+  <h3 style="margin-top:14px">Zestawy z uruchamianym przepływem</h3>
+  <ul class="male">{% for z in przeplywy.zestawy %}
+    <li><a href="{% url 'panel:zestaw' z.pk %}">{{ z.kurs.rok }} · {{ z }}</a>: <code>{{ z.przeplyw_plik }}</code>
+      co {{ z.przeplyw_co_minut }} min, {{ z.get_przeplyw_start_display }}</li>{% endfor %}</ul>
+  <p class="male drugie">Repozytoria studentów: {% for etykieta, liczba in przeplywy.stany %}{{ etykieta }} {{ liczba }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+  {% endif %}
 </section>
 
 <section class="karta" id="modele">

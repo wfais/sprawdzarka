@@ -89,9 +89,21 @@ repozytorium startowe grupy dostaje nowy commit, a w repozytorium każdego stude
 poprawionych testów; pliki w wersjach prowadzącego (także stary szkielet u studenta, który jeszcze nie scalił poprawki)
 nie są liczone jako zmiany studenta. Robot sam sprawdza, kto już scalił.
 
-**GitHub Actions.** Sprawdzarka nie korzysta z GitHub Actions. Przy tworzeniu repozytorium startowego katalog
+**GitHub Actions.** Sprawdzarka nie korzysta z GitHub Actions do oceniania. Przy tworzeniu repozytorium startowego katalog
 `.github/workflows` z repozytorium źródłowego jest pomijany (np. pozostałości po Classroom), chyba że w zestawie
 zaznaczysz „kopiuj konfigurację GitHub Actions”. Wtedy aplikacja GitHub potrzebuje uprawnienia Workflows.
+
+**Uruchamianie przepływów** (np. okresowe zbieranie danych przez studentów). Harmonogram GitHub (`schedule`) w nowych
+repozytoriach bywa zawodny: potrafi nie ruszyć wcale, choć uruchomienie na żądanie (`workflow_dispatch`, przycisk
+*Run workflow*) działa zawsze. W zestawie można więc wskazać plik przepływu (pole „uruchamiany przepływ GitHub Actions”,
+np. `traficar.yml`), odstęp w minutach i moment startu: gdy student włączy harmonogram w pliku przepływu (odkomentuje
+`schedule:` i linię `cron`) albo od razu. Robot w pełnym cyklu (na serwerze co 30 minut) uruchamia przepływ w każdym
+repozytorium studenta, jeśli od ostatniego uruchomienia minął wskazany odstęp. Uruchamianie kończy się samo, gdy przepływ
+zostanie wyłączony (także przez siebie samego, np. po zebraniu danych) albo minie termin ostateczny studenta.
+Całość włącza główny wyłącznik w „Ustawieniach” (sekcja „Przepływy GitHub Actions”), gdzie jest też dzienny limit
+uruchomień chroniący minuty organizacji. Stan przepływu (czeka na start, uruchamiany, zakończony, błąd), czas ostatniego
+uruchomienia i ich liczba są na karcie studenta. Aplikacja GitHub potrzebuje do tego uprawnień Actions i Workflows.
+Bez wskazanego pliku przepływu i bez włączenia w Ustawieniach nic się nie zmienia.
 
 **Zmienione testy** (odpowiednik flagi z GitHub Classroom): przy każdym przeliczeniu system porównuje z wersją startową
 pliki testów, ich dane (cała zawartość katalogów `tests/`, `test/`, `testy/`) i konfigurację pytest (`conftest.py`, `pytest.ini` itd.).

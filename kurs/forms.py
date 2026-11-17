@@ -5,7 +5,10 @@ from decimal import Decimal
 from django import forms
 from django.utils import timezone
 
-from .models import Grupa, Kurs, Precedens, Przydzial, Rok, Student, Uczelnia, Zadanie, Zestaw, Zgloszenie, skrot_roku
+from .models import (
+    Grupa, Kurs, Precedens, Przydzial, Rok, Student, Uczelnia, UstawieniaSerwisu, Zadanie, Zestaw, Zgloszenie,
+    skrot_roku,
+)
 
 
 class PoleDatyICzasu(forms.DateTimeInput):
@@ -137,7 +140,7 @@ class FormularzZestawu(_WKursie, forms.ModelForm):
         model = Zestaw
         fields = [
             "rodzaj", "nazwa", "skrot", "repo_zrodlowe", "wzorce_kodu", "punkty_max", "tresc_pdf", "tresc_tekst",
-            "zasady_oceny", "modele", "kopiuj_actions",
+            "zasady_oceny", "modele", "kopiuj_actions", "przeplyw_plik", "przeplyw_co_minut", "przeplyw_start",
         ]
         widgets = {
             "tresc_pdf": forms.ClearableFileInput(attrs={"accept": "application/pdf"}),
@@ -151,6 +154,19 @@ class FormularzZestawu(_WKursie, forms.ModelForm):
 
         dostepne = ", ".join(m.identyfikator for m in skonfigurowane() if m.skonfigurowany)
         self.fields["modele"].help_text += f" Dostępne: {dostepne or 'brak (uzupełnij plik .env)'}."
+        # Pola przeplywu maja wartosci domyslne: formularz bez nich (np. starszy) zachowuje ustawienia
+        for pole in ("przeplyw_co_minut", "przeplyw_start"):
+            self.fields[pole].required = False
+
+    def clean_przeplyw_co_minut(self):
+        wartosc = self.cleaned_data.get("przeplyw_co_minut")
+        if wartosc is None:
+            return self.instance.przeplyw_co_minut if self.instance.pk else Zestaw._meta.get_field("przeplyw_co_minut").default
+        return wartosc
+
+    def clean_przeplyw_start(self):
+        return (self.cleaned_data.get("przeplyw_start") or self.instance.przeplyw_start
+                or Zestaw.StartPrzeplywu.HARMONOGRAM)
 
     def clean_repo_zrodlowe(self):
         wartosc = oczysc_repo(self.cleaned_data["repo_zrodlowe"])
@@ -351,6 +367,12 @@ FormularzeKopiiPrzydzialu = forms.formset_factory(FormularzKopiiPrzydzialu, form
 
 class FormularzImportu(forms.Form):
     plik = forms.FileField(label="Plik archiwum (.json)", widget=forms.ClearableFileInput(attrs={"accept": ".json"}))
+
+
+class FormularzPrzeplywow(forms.ModelForm):
+    class Meta:
+        model = UstawieniaSerwisu
+        fields = ["przeplywy_wlaczone", "przeplywy_limit"]
 
 
 class FormularzWyjatku(forms.ModelForm):

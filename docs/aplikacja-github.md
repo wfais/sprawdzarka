@@ -50,6 +50,10 @@ robot co kilka minut sam pobiera historię wypchnięć z GitHuba.
 | Issues | Read and write | komentarz z oceną w pull requeście |
 | Metadata | Read-only | wymagane zawsze (ustawia się samo) |
 | Workflows | Read and write | **tylko** jeśli któryś zestaw ma włączone „kopiuj konfigurację GitHub Actions” |
+| Actions | Read and write | **tylko** jeśli robot ma uruchamiać przepływy (pole „uruchamiany przepływ GitHub Actions” w zestawie) |
+
+Uprawnienia można dodać później: po zmianie w ustawieniach aplikacji GitHub prosi właściciela organizacji
+o akceptację nowych uprawnień instalacji. Do tego czasu aplikacja działa na dotychczasowych uprawnieniach.
 
 **Organization permissions** i **Account permissions**: bez zmian (brak dostępu).
 
