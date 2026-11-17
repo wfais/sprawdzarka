@@ -130,6 +130,21 @@
       </div>
     </div>
 
+    {% if z.przydzial.zestaw.przeplyw_plik %}
+    <div class="karta">
+      <h2>Przepływ GitHub Actions</h2>
+      <dl class="opis-pola">
+        <dt>Przepływ</dt><dd><a class="mono" href="{{ z.url_repo }}/actions/workflows/{{ z.przydzial.zestaw.przeplyw_plik }}" target="_blank" rel="noopener">{{ z.przydzial.zestaw.przeplyw_plik }}</a></dd>
+        <dt>Stan</dt><dd>{% if z.przeplyw_stan %}<span class="znacznik {% if z.przeplyw_stan == 'dziala' %}zielony{% elif z.przeplyw_stan == 'blad' or z.przeplyw_stan == 'brak' %}czerwony{% elif z.przeplyw_stan == 'zakonczony' %}fiolet{% else %}szary{% endif %}">{{ z.get_przeplyw_stan_display }}</span>
+          {% else %}<span class="slabe">jeszcze nie sprawdzano</span>{% endif %}
+          {% if z.przeplyw_opis %}<div class="male drugie">{{ z.przeplyw_opis }}</div>{% endif %}</dd>
+        <dt>Ostatnie uruchomienie</dt><dd>{{ z.przeplyw_ostatnie|date:"d.m.Y H:i"|default:"brak" }}</dd>
+        <dt>Uruchomienia przez Sprawdzarkę</dt><dd>{{ z.przeplyw_wyzwolenia }}</dd>
+        {% if z.przeplyw_sprawdzono %}<dt>Sprawdzono</dt><dd class="male">{{ z.przeplyw_sprawdzono|date:"d.m.Y H:i" }}</dd>{% endif %}
+      </dl>
+    </div>
+    {% endif %}
+
     <details class="karta rozwijana">
       <summary><h2>Wypchnięcia <span class="drugie male">{{ wypchniecia|length }}</span></h2></summary>
       {% if wypchniecia %}

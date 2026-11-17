@@ -17,17 +17,17 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import archiwum, logowanie, oceniacze, ocena, poligon, poprawki, stany, uslugi
+from . import archiwum, logowanie, oceniacze, ocena, poligon, poprawki, przeplywy, stany, uslugi
 from .github import klient as gh
 from . import struktura as kopiowanie
 from .forms import (
     FormularzeKopiiPrzydzialu, FormularzeZadan, FormularzEdycjiPrzydzialu, FormularzGrupy, FormularzImportu,
     FormularzKopiiKursu, FormularzKopiiZestawu, FormularzKursu, FormularzNazwiska, FormularzNowejGrupy, FormularzOceny,
-    FormularzPrecedensu,
+    FormularzPrecedensu, FormularzPrzeplywow,
     FormularzPrzydzialu, FormularzRoku, FormularzUczelni, FormularzWyjatku, FormularzZestawu,
 )
 from .models import (
-    Ewaluacja, Grupa, KontoProwadzacego, UstawieniaSerwisu, Kurs, NieudaneLogowanie, Poprawka, Precedens, Przydzial, Rok, Student, Uczelnia, Wypchniecie, Zestaw, Zgloszenie,
+    Ewaluacja, Grupa, KontoProwadzacego, UstawieniaSerwisu, Kurs, NieudaneLogowanie, Poprawka, Precedens, Przydzial, Rok, StanPrzeplywu, Student, Uczelnia, Wypchniecie, Zestaw, Zgloszenie,
 )
 
 log = logging.getLogger(__name__)
@@ -589,7 +589,21 @@ def ustawienia(request):
         "limit_prob": settings.PANEL_LIMIT_PROB, "blokada_minut": settings.PANEL_BLOKADA_MINUT,
         "nieudane": NieudaneLogowanie.objects.filter(czas__gte=od).count(),
         "f_importu": FormularzImportu(),
+        "f_przeplywow": FormularzPrzeplywow(instance=UstawieniaSerwisu.biezace()),
+        "przeplywy": _stan_przeplywow(),
     })
+
+
+def _stan_przeplywow() -> dict:
+    """Podsumowanie uruchamiania przeplywow GitHub Actions do sekcji Ustawien."""
+    ustawienia = UstawieniaSerwisu.biezace()
+    dzisiaj = ustawienia.przeplywy_licznik if ustawienia.przeplywy_dzien == timezone.localdate() else 0
+    zestawy = (Zestaw.objects.exclude(przeplyw_plik="").exclude(kurs__rok__zarchiwizowany=True)
+               .exclude(kurs__rok__poligon=True).select_related("kurs__rok"))
+    stany = dict(Zgloszenie.objects.filter(pk__in=przeplywy.do_obslugi().values("pk")).exclude(przeplyw_stan="")
+                 .values_list("przeplyw_stan").annotate(liczba=Count("pk")))
+    return {"ustawienia": ustawienia, "dzisiaj": dzisiaj, "zestawy": zestawy,
+            "stany": [(etykieta, stany.get(kod, 0)) for kod, etykieta in StanPrzeplywu.choices]}
 
 
 def _do_ustawien(kotwica: str):
@@ -607,6 +621,21 @@ def tryb_serwisowy(request):
     else:
         messages.success(request, "Tryb serwisowy wyłączony: linki dla studentów działają normalnie.")
     return _do_ustawien("#serwis")
+
+
+@prowadzacy
+@require_POST
+def przeplywy_ustawienia(request):
+    formularz = FormularzPrzeplywow(request.POST, instance=UstawieniaSerwisu.biezace())
+    if formularz.is_valid():
+        formularz.save()
+        if formularz.instance.przeplywy_wlaczone:
+            messages.success(request, "Uruchamianie przepływów GitHub Actions włączone.")
+        else:
+            messages.warning(request, "Uruchamianie przepływów GitHub Actions wyłączone.")
+    else:
+        messages.error(request, "Nie zapisano: popraw dzienny limit uruchomień.")
+    return _do_ustawien("#przeplywy")
 
 
 @prowadzacy

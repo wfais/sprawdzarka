@@ -328,6 +328,44 @@ def readme(pelna: str, ref: str) -> Optional[str]:
     return base64.b64decode(dane.get("content", "")).decode("utf-8", errors="replace")
 
 
+# --- GitHub Actions: przeplywy uruchamiane przez robota ---
+
+def przeplyw(pelna: str, plik: str) -> Optional[dict]:
+    """Dane przeplywu z .github/workflows/<plik> (m.in. path i state); None, gdy repozytorium go nie ma."""
+    try:
+        return zapytanie("GET", f"/repos/{pelna}/actions/workflows/{plik}")
+    except BladGitHub as blad:
+        if blad.status == 404:
+            return None
+        raise
+
+
+def ostatnie_uruchomienie(pelna: str, plik: str) -> Optional[dict]:
+    """Najnowsze uruchomienie przeplywu (dowolnego rodzaju) albo None."""
+    dane = zapytanie("GET", f"/repos/{pelna}/actions/workflows/{plik}/runs", params={"per_page": 1}) or {}
+    uruchomienia = dane.get("workflow_runs") or []
+    return uruchomienia[0] if uruchomienia else None
+
+
+def uruchom_przeplyw(pelna: str, plik: str, galaz: str) -> None:
+    """Uruchomienie na zadanie (jak przycisk Run workflow); przeplyw musi miec zdarzenie workflow_dispatch."""
+    zapytanie("POST", f"/repos/{pelna}/actions/workflows/{plik}/dispatches", oczekiwane=(200, 204),
+              json={"ref": galaz})
+
+
+def plik_tekstowy(pelna: str, sciezka: str, ref: Optional[str] = None) -> Optional[str]:
+    """Tresc pliku z repozytorium (domyslnie z galezi domyslnej); None, gdy pliku nie ma."""
+    try:
+        dane = zapytanie("GET", f"/repos/{pelna}/contents/{sciezka}", params={"ref": ref} if ref else None)
+    except BladGitHub as blad:
+        if blad.status == 404:
+            return None
+        raise
+    if not isinstance(dane, dict) or dane.get("type") != "file":
+        return None
+    return base64.b64decode(dane.get("content", "")).decode("utf-8", errors="replace")
+
+
 # --- Pull request "Feedback" ---
 
 def utworz_pr(pelna: str, head: str, base: str, tytul: str, tresc: str) -> int:

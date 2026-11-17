@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 POLA_ZESTAWU = [
     "rodzaj", "nazwa", "repo_zrodlowe", "wzorce_kodu", "punkty_max", "tresc_tekst", "zasady_oceny", "modele",
-    "kopiuj_actions",
+    "kopiuj_actions", "przeplyw_plik", "przeplyw_co_minut", "przeplyw_start",
 ]
 POLA_ZADANIA = ["kolejnosc", "kod", "katalog", "punkty", "kryteria", "tryb"]
 
