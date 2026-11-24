@@ -18,28 +18,6 @@
     a zmiany wysłane przez studentów liczą się według czasu wysłania.</p>
 </section>
 
-<section class="karta" id="przeplywy">
-  <h2>Przepływy GitHub Actions</h2>
-  <p class="drugie male">Robot co około 30 minut uruchamia przepływy wskazane w zestawach (pole „uruchamiany przepływ GitHub Actions”)
-    w repozytoriach studentów, tak jak przycisk <i>Run workflow</i>. Harmonogram GitHub (<code>schedule</code>) w nowych repozytoriach
-    bywa zawodny, a uruchomienie na żądanie działa zawsze. Aplikacja GitHub potrzebuje uprawnień <b>Actions</b> i <b>Workflows</b>
-    (odczyt i zapis). Uruchomienia zużywają minuty GitHub Actions organizacji.</p>
-  <p class="stan"><i class="dioda {% if przeplywy.ustawienia.przeplywy_wlaczone %}zielony{% else %}wylaczona{% endif %}" aria-hidden="true"></i>
-    {% if przeplywy.ustawienia.przeplywy_wlaczone %}<b>włączone</b>{% else %}wyłączone{% endif %};
-    dziś uruchomiono {{ przeplywy.dzisiaj }} z {{ przeplywy.ustawienia.przeplywy_limit }}</p>
-  <form method="post" action="{% url 'panel:przeplywy_ustawienia' %}" class="formularz" style="max-width:520px">{% csrf_token %}
-    {{ f_przeplywow.as_div }}
-    <div class="przyciski"><button class="maly glowny" type="submit">Zapisz</button></div>
-  </form>
-  {% if przeplywy.zestawy %}
-  <h3 style="margin-top:14px">Zestawy z uruchamianym przepływem</h3>
-  <ul class="male">{% for z in przeplywy.zestawy %}
-    <li><a href="{% url 'panel:zestaw' z.pk %}">{{ z.kurs.rok }} · {{ z }}</a>: <code>{{ z.przeplyw_plik }}</code>
-      co {{ z.przeplyw_co_minut }} min, {{ z.get_przeplyw_start_display }}</li>{% endfor %}</ul>
-  <p class="male drugie">Repozytoria studentów: {% for etykieta, liczba in przeplywy.stany %}{{ etykieta }} {{ liczba }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
-  {% endif %}
-</section>
-
 <section class="karta" id="modele">
   <h2>Modele oceniające</h2>
   <p class="drugie male">Lista pochodzi z pliku <code>.env</code> (zmienna <code>OCENIAJACE_MODELE</code>), klucze API też są tylko tam.
@@ -80,6 +58,28 @@ OCENIAJACE_MODELE=demo:a,demo:b,demo:c</pre>
     <p class="drugie male">Dokładne nazwy modeli sprawdź w dokumentacji dostawcy. W ustawieniach zestawu możesz wybrać podzbiór modeli.</p>
   </details>
 </section>
+
+<details class="karta rozwijana" id="przeplywy">
+  <summary><h2>Przepływy GitHub Actions <span class="drugie male">{% if przeplywy.ustawienia.przeplywy_wlaczone %}włączone{% else %}wyłączone{% endif %}</span></h2></summary>
+  <p class="drugie male">Robot co około 30 minut uruchamia przepływy wskazane w zestawach (pole „uruchamiany przepływ GitHub Actions”)
+    w repozytoriach studentów, tak jak przycisk <i>Run workflow</i>. Harmonogram GitHub (<code>schedule</code>) w nowych repozytoriach
+    bywa zawodny, a uruchomienie na żądanie działa zawsze. Aplikacja GitHub potrzebuje uprawnień <b>Actions</b> i <b>Workflows</b>
+    (odczyt i zapis). Uruchomienia zużywają minuty GitHub Actions organizacji.</p>
+  <p class="stan"><i class="dioda {% if przeplywy.ustawienia.przeplywy_wlaczone %}zielony{% else %}wylaczona{% endif %}" aria-hidden="true"></i>
+    {% if przeplywy.ustawienia.przeplywy_wlaczone %}<b>włączone</b>{% else %}wyłączone{% endif %};
+    dziś uruchomiono {{ przeplywy.dzisiaj }} z {{ przeplywy.ustawienia.przeplywy_limit }}</p>
+  <form method="post" action="{% url 'panel:przeplywy_ustawienia' %}" class="formularz" style="max-width:520px">{% csrf_token %}
+    {{ f_przeplywow.as_div }}
+    <div class="przyciski"><button class="maly glowny" type="submit">Zapisz</button></div>
+  </form>
+  {% if przeplywy.zestawy %}
+  <h3 style="margin-top:14px">Zestawy z uruchamianym przepływem</h3>
+  <ul class="male">{% for z in przeplywy.zestawy %}
+    <li><a href="{% url 'panel:zestaw' z.pk %}">{{ z.kurs.rok }} · {{ z }}</a>: <code>{{ z.przeplyw_plik }}</code>
+      co {{ z.przeplyw_co_minut }} min, {{ z.get_przeplyw_start_display }}</li>{% endfor %}</ul>
+  <p class="male drugie">Repozytoria studentów: {% for etykieta, liczba in przeplywy.stany %}{{ etykieta }} {{ liczba }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+  {% endif %}
+</details>
 
 <div class="siatka-polowy">
   <section class="karta">

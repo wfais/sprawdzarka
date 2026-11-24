@@ -215,7 +215,7 @@ details.rozwijana[open] > summary { margin-bottom: 14px; }
 .karta-poligonu > h2:first-child, .karta-poligonu.rozwijana > summary { margin-top: -17px; }
 details.karta.rozwijana > summary { margin: -18px -20px 0; padding: 10px 20px 9px; background: var(--pasek-karty); }
 details.karta.rozwijana:not([open]) { padding-bottom: 0; }
-details.karta.rozwijana[open] > summary { border-bottom: 1px solid var(--linia); }
+details.karta.rozwijana[open] > summary { border-bottom: 1px solid var(--linia); margin-bottom: 14px; }
 details.karta.rozwijana > summary:hover h2 { color: var(--akcent); }
 /* Uczelnie, przedmioty, grupy, zestawy: lata akademickie w karcie uczelni */
 .rok-uczelni { padding: 12px 0 6px; border-top: 1px solid var(--linia); }

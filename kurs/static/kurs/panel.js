@@ -304,3 +304,15 @@ document.addEventListener("click", function (zdarzenie) {
     pole.focus();
   }, true);
 })();
+
+// Kotwica w adresie (np. po zapisie ustawien) otwiera zwinieta karte, na ktora wskazuje
+(function () {
+  function otworz() {
+    if (!location.hash) return;
+    var cel = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    var karta = cel && (cel.tagName === "DETAILS" ? cel : cel.closest("details"));
+    if (karta && !karta.open) karta.open = true;
+  }
+  otworz();
+  window.addEventListener("hashchange", otworz);
+})();
