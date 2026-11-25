@@ -100,6 +100,8 @@ np. `traficar.yml`), odstęp w minutach i moment startu: gdy student włączy ha
 `schedule:` i linię `cron`) albo od razu. Robot w pełnym cyklu (na serwerze co 30 minut) uruchamia przepływ w każdym
 repozytorium studenta, jeśli od ostatniego uruchomienia minął wskazany odstęp. Uruchamianie kończy się samo, gdy przepływ
 zostanie wyłączony (także przez siebie samego, np. po zebraniu danych) albo minie termin ostateczny studenta.
+Po 3 nieudanych uruchomieniach z rzędu (anulowane się nie liczą) robot wstrzymuje uruchamianie w tym repozytorium,
+żeby nie zużywać minut na błędny kod; po pierwszym udanym uruchomieniu (np. ręcznym po poprawce) wraca do normalnego rytmu.
 Całość włącza główny wyłącznik w „Ustawieniach” (sekcja „Przepływy GitHub Actions”), gdzie jest też dzienny limit
 uruchomień chroniący minuty organizacji. Stan przepływu (czeka na start, uruchamiany, zakończony, błąd), czas ostatniego
 uruchomienia i ich liczba są na karcie studenta. Aplikacja GitHub potrzebuje do tego uprawnień Actions i Workflows.

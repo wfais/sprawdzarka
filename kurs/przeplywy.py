@@ -23,6 +23,21 @@ log = logging.getLogger(__name__)
 
 # Uruchomienia w toku: nowego nie zlecamy
 W_TOKU = {"queued", "in_progress", "waiting", "requested", "pending"}
+
+# Seria nieudanych uruchomien wstrzymuje automatyczne uruchamianie (oszczednosc minut Actions organizacji).
+# Regula: bierzemy najnowsze uruchomienia zakonczone (status completed), pomijajac anulowane (cancelled), ktore
+# ani nie licza sie jako blad, ani nie przerywaja serii. Jesli BLEDY_Z_RZEDU najnowszych z nich zakonczylo sie
+# porazka, przeplyw nie jest uruchamiany. Kazdy inny wynik (np. success, skipped) przerywa serie, wiec po
+# udanym uruchomieniu (np. recznym po poprawce) robot sam wraca do normalnego uruchamiania.
+BLEDY_Z_RZEDU = 3
+PORAZKI = {"failure", "timed_out", "startup_failure"}
+# Ile ostatnich uruchomien pobieramy jednym zapytaniem: zapas na uruchomienia anulowane
+POBIERANE_URUCHOMIENIA = 10
+OPIS_SERII_BLEDOW = (
+    f"{BLEDY_Z_RZEDU} nieudane uruchomienia z rzędu: przepływ nie jest uruchamiany automatycznie. "
+    "Popraw kod i uruchom przepływ ręcznie (zakładka Actions, przycisk Run workflow); "
+    "po udanym uruchomieniu zbieranie wznowi się samo."
+)
 _SCHEDULE = re.compile(r"\s*schedule\s*:\s*$")
 _CRON = re.compile(r"\s*-\s*cron\s*:\s*\S")
 
@@ -33,6 +48,13 @@ def harmonogram_wlaczony(tresc: Optional[str]) -> bool:
         return False
     linie = [linia.split("#", 1)[0] for linia in tresc.splitlines()]
     return any(_SCHEDULE.fullmatch(linia) for linia in linie) and any(_CRON.match(linia) for linia in linie)
+
+
+def seria_bledow(uruchomienia: list) -> bool:
+    """Czy BLEDY_Z_RZEDU najnowszych zakonczonych uruchomien (bez anulowanych) to porazki (regula wyzej)."""
+    zakonczone = [u for u in uruchomienia if u.get("status") == "completed" and u.get("conclusion") != "cancelled"]
+    najnowsze = zakonczone[:BLEDY_Z_RZEDU]
+    return len(najnowsze) == BLEDY_Z_RZEDU and all(u.get("conclusion") in PORAZKI for u in najnowsze)
 
 
 def _czas(tekst: Optional[str]) -> Optional[datetime]:
@@ -95,11 +117,14 @@ def obsluz(zgloszenie: Zgloszenie, ustawienia: UstawieniaSerwisu, teraz: Optiona
             if not harmonogram_wlaczony(gh.plik_tekstowy(pelna, przeplyw.get("path") or f".github/workflows/{plik}")):
                 return _zapisz(zgloszenie, StanPrzeplywu.CZEKA,
                                "Student jeszcze nie włączył harmonogramu (schedule) w pliku przepływu.", teraz)
-        ostatnie = gh.ostatnie_uruchomienie(pelna, plik)
+        uruchomienia = gh.ostatnie_uruchomienia(pelna, plik, POBIERANE_URUCHOMIENIA)
+        ostatnie = uruchomienia[0] if uruchomienia else None
         czas_ostatniego = _czas(ostatnie.get("created_at")) if ostatnie else None
         pola = {"przeplyw_ostatnie": czas_ostatniego} if czas_ostatniego else {}
         if ostatnie and ostatnie.get("status") in W_TOKU:
             return _zapisz(zgloszenie, StanPrzeplywu.DZIALA, "Uruchomienie w toku.", teraz, **pola)
+        if seria_bledow(uruchomienia):
+            return _zapisz(zgloszenie, StanPrzeplywu.BLAD, OPIS_SERII_BLEDOW, teraz, **pola)
         odstep = timedelta(minutes=zestaw.przeplyw_co_minut) - margines(zestaw.przeplyw_co_minut)
         if czas_ostatniego and teraz - czas_ostatniego < odstep:
             wynik = ostatnie.get("conclusion") or ostatnie.get("status") or ""

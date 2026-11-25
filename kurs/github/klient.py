@@ -340,11 +340,10 @@ def przeplyw(pelna: str, plik: str) -> Optional[dict]:
         raise
 
 
-def ostatnie_uruchomienie(pelna: str, plik: str) -> Optional[dict]:
-    """Najnowsze uruchomienie przeplywu (dowolnego rodzaju) albo None."""
-    dane = zapytanie("GET", f"/repos/{pelna}/actions/workflows/{plik}/runs", params={"per_page": 1}) or {}
-    uruchomienia = dane.get("workflow_runs") or []
-    return uruchomienia[0] if uruchomienia else None
+def ostatnie_uruchomienia(pelna: str, plik: str, ile: int = 3) -> list:
+    """Najnowsze uruchomienia przeplywu (dowolnego rodzaju), od najnowszego; pusta lista, gdy ich nie ma."""
+    dane = zapytanie("GET", f"/repos/{pelna}/actions/workflows/{plik}/runs", params={"per_page": ile}) or {}
+    return list(dane.get("workflow_runs") or [])[:ile]
 
 
 def uruchom_przeplyw(pelna: str, plik: str, galaz: str) -> None:

@@ -28,7 +28,9 @@ class FalszyweActions:
         self.stan = "active"
         self.jest = True
         self.tresc = WLACZONY
-        self.ostatnie = None
+        self.ostatnie = None      # najnowsze uruchomienie (skrot, gdy historia jest pusta)
+        self.historia = []        # ostatnie uruchomienia, od najnowszego
+        self.zapytania_o_uruchomienia = 0
         self.uruchomienia = []
         self.blad = None
 
@@ -40,8 +42,10 @@ class FalszyweActions:
     def plik_tekstowy(self, pelna, sciezka, ref=None):
         return self.tresc
 
-    def ostatnie_uruchomienie(self, pelna, plik):
-        return self.ostatnie
+    def ostatnie_uruchomienia(self, pelna, plik, ile=3):
+        self.zapytania_o_uruchomienia += 1
+        historia = self.historia or ([self.ostatnie] if self.ostatnie else [])
+        return historia[:ile]
 
     def uruchom_przeplyw(self, pelna, plik, galaz):
         self.uruchomienia.append((pelna, plik, galaz))
@@ -50,7 +54,7 @@ class FalszyweActions:
 @pytest.fixture
 def actions(monkeypatch):
     falszywe = FalszyweActions()
-    for nazwa in ("przeplyw", "plik_tekstowy", "ostatnie_uruchomienie", "uruchom_przeplyw"):
+    for nazwa in ("przeplyw", "plik_tekstowy", "ostatnie_uruchomienia", "uruchom_przeplyw"):
         monkeypatch.setattr(klient_modul, nazwa, getattr(falszywe, nazwa))
     return falszywe
 
@@ -141,6 +145,66 @@ def test_uruchomienie_w_toku_nie_jest_dublowane(actions, wlaczone, zgloszenie):
     actions.ostatnie = _uruchomienie(120, status="in_progress", wynik=None)
     przeplywy.cykl()
     assert actions.uruchomienia == []
+
+
+def _seria(*wyniki):
+    """Historia uruchomien od najnowszego, co godzine (najnowsze 70 minut temu, czyli po odstepie)."""
+    return [_uruchomienie(70 + 60 * i, wynik=w) for i, w in enumerate(wyniki)]
+
+
+@pytest.mark.django_db
+def test_trzy_porazki_z_rzedu_wstrzymuja_uruchamianie(actions, wlaczone, zgloszenie):
+    actions.historia = _seria("failure", "timed_out", "startup_failure")
+    assert przeplywy.cykl() == {StanPrzeplywu.BLAD: 1}
+    assert actions.uruchomienia == []
+    assert actions.zapytania_o_uruchomienia == 1   # jedno zapytanie o historie uruchomien
+    zgloszenie.refresh_from_db()
+    assert zgloszenie.przeplyw_stan == StanPrzeplywu.BLAD
+    assert zgloszenie.przeplyw_opis == przeplywy.OPIS_SERII_BLEDOW
+    assert zgloszenie.przeplyw_opis.startswith("3 nieudane uruchomienia z rzędu: przepływ nie jest uruchamiany")
+    assert zgloszenie.przeplyw_ostatnie is not None
+    assert UstawieniaSerwisu.biezace().przeplywy_licznik == 0
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("wyniki, uruchomiono", [
+    (("failure", "failure"), True),                                    # dwie porazki: za malo
+    (("success", "failure", "failure"), True),                         # udane (np. reczne po poprawce) wznawia
+    (("failure", "failure", "success", "failure"), True),              # sukces przerywa serie
+    (("failure", "skipped", "failure", "failure"), True),              # inny wynik tez przerywa serie
+    # anulowane sa pomijane: nie licza sie jako blad i nie przerywaja serii
+    (("failure", "cancelled", "failure", "failure"), False),
+    (("cancelled", "failure", "failure", "failure"), False),
+    (("failure", "cancelled", "cancelled", "failure"), True),          # tylko dwie zakonczone porazki
+    (("cancelled", "cancelled", "cancelled"), True),
+])
+def test_regula_serii_bledow(actions, wlaczone, zgloszenie, wyniki, uruchomiono):
+    actions.historia = _seria(*wyniki)
+    przeplywy.cykl()
+    assert bool(actions.uruchomienia) is uruchomiono
+    zgloszenie.refresh_from_db()
+    assert zgloszenie.przeplyw_stan == (StanPrzeplywu.DZIALA if uruchomiono else StanPrzeplywu.BLAD)
+
+
+@pytest.mark.django_db
+def test_uruchomienie_w_toku_ma_pierwszenstwo_przed_seria_bledow(actions, wlaczone, zgloszenie):
+    actions.historia = [_uruchomienie(5, status="in_progress", wynik=None)] + _seria("failure", "failure", "failure")
+    przeplywy.cykl()
+    assert actions.uruchomienia == []
+    zgloszenie.refresh_from_db()
+    assert zgloszenie.przeplyw_stan == StanPrzeplywu.DZIALA
+    assert zgloszenie.przeplyw_opis == "Uruchomienie w toku."
+
+
+@pytest.mark.django_db
+def test_seria_bledow_widoczna_na_karcie_i_w_ustawieniach(client, prowadzacy, actions, wlaczone, zgloszenie):
+    actions.historia = _seria("failure", "failure", "failure")
+    przeplywy.cykl()
+    karta = client.get(f"/panel/zgloszenia/{zgloszenie.pk}/").content.decode()
+    assert '<span class="znacznik czerwony">błąd</span>' in karta
+    assert "3 nieudane uruchomienia z rzędu" in karta and "przycisk Run workflow" in karta
+    ustawienia = client.get("/panel/ustawienia/").content.decode()
+    assert "błąd 1" in ustawienia
 
 
 @pytest.mark.django_db
